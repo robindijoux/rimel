@@ -15,7 +15,6 @@ def contributerMatcher(date):
 
 def read_file():
     contributors = []
- 
     try:
         with open('test.txt', 'r') as f:
             for line in f:
@@ -24,16 +23,30 @@ def read_file():
                 if contributerMatcher(x[2]):
                    contributors.append(name[1:])
                 else:
-                    contributors.append(name[1:] + " " + x[2])
-
-            print(contributors)    
+                   contributors.append(name[1:] + " " + x[2])       
+            return contributors    
     except Exception as e:
         print(e)
 
 
+def findPaternityOwner(contributors):
+    dict = set()
+    for name in contributors:
+      dict.add((name,occurence(contributors,name)))
+    determinePaternity(dict)
+
+def occurence(liste, element):
+    count = 0
+    for i in liste:
+        if i == element:
+            count += 1
+    return count
+
+
+def determinePaternity(contributors): 
+    x = sorted(list(contributors),key=lambda x: -x[1])
+    print(x)
     
-        
 
-
-read_file()
+findPaternityOwner(read_file())
 
