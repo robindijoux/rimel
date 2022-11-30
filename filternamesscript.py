@@ -46,7 +46,21 @@ def occurence(liste, element):
 def determinePaternity(contributors): 
     x = sorted(list(contributors),key=lambda x: -x[1])
     print(x)
+
+
+def extractIfDefFiles():
+    dict = set()
+    try:
+         with open('ifdef_found.txt', 'r') as f:
+          for line in f:
+                x =  line.split(":")  
+                dict.add(x[0])  
+         print(dict)       
+    except Exception as e:
+        print(e)
     
 
-findPaternityOwner(read_file())
+#findPaternityOwner(read_file())
+
+extractIfDefFiles()
 
