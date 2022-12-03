@@ -1,919 +1,710 @@
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   1) /* lzo1x_9x.c -- implementation of the LZO1X-999 compression algorithm
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   2) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   3)    This file is part of the LZO real-time data compression library.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   4) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   5)    Copyright (C) 2008 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   6)    Copyright (C) 2007 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   7)    Copyright (C) 2006 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   8)    Copyright (C) 2005 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000   9)    Copyright (C) 2004 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  10)    Copyright (C) 2003 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  11)    Copyright (C) 2002 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  12)    Copyright (C) 2001 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  13)    Copyright (C) 2000 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  14)    Copyright (C) 1999 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  15)    Copyright (C) 1998 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  16)    Copyright (C) 1997 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  17)    Copyright (C) 1996 Markus Franz Xaver Johannes Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  18)    All Rights Reserved.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  19) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  20)    The LZO library is free software; you can redistribute it and/or
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  21)    modify it under the terms of the GNU General Public License as
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  22)    published by the Free Software Foundation; either version 2 of
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  23)    the License, or (at your option) any later version.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  24) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  25)    The LZO library is distributed in the hope that it will be useful,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  26)    but WITHOUT ANY WARRANTY; without even the implied warranty of
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  27)    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  28)    GNU General Public License for more details.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  29) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  30)    You should have received a copy of the GNU General Public License
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  31)    along with the LZO library; see the file COPYING.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  32)    If not, write to the Free Software Foundation, Inc.,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  33)    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  34) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  35)    Markus F.X.J. Oberhumer
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  36)    <markus@oberhumer.com>
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  37)    http://www.oberhumer.com/opensource/lzo/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  38) */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  39) #include "libbb.h"
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  40) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  41) /* The following is probably only safe on Intel-compatible processors ... */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  42) #define LZO_UNALIGNED_OK_2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  43) #define LZO_UNALIGNED_OK_4
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  44) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  45) #include "liblzo.h"
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  46) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  47) #define LZO_MAX(a,b)        ((a) >= (b) ? (a) : (b))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  48) #define LZO_MIN(a,b)        ((a) <= (b) ? (a) : (b))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  49) #define LZO_MAX3(a,b,c)     ((a) >= (b) ? LZO_MAX(a,c) : LZO_MAX(b,c))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  50) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  51) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  52) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  53) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  54) #define SWD_N           M4_MAX_OFFSET   /* size of ring buffer */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  55) #define SWD_F           2048           /* upper limit for match length */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  56) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  57) #define SWD_BEST_OFF    (LZO_MAX3(M2_MAX_LEN, M3_MAX_LEN, M4_MAX_LEN) + 1)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  58) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  59) typedef struct {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  60) 	int init;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  61) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  62) 	unsigned look;          /* bytes in lookahead buffer */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  63) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  64) 	unsigned m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  65) 	unsigned m_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  66) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  67) 	const uint8_t *bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  68) 	const uint8_t *ip;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  69) 	const uint8_t *in;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  70) 	const uint8_t *in_end;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  71) 	uint8_t *out;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  72) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  73) 	unsigned r1_lit;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  74) } lzo1x_999_t;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  75) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  76) #define getbyte(c)  ((c).ip < (c).in_end ? *((c).ip)++ : (-1))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  77) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  78) /* lzo_swd.c -- sliding window dictionary */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  79) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  80) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  81) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  82) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  83) #define SWD_UINT_MAX      USHRT_MAX
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  84) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  85) #ifndef SWD_HSIZE
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  86) #  define SWD_HSIZE         16384
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  87) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  88) #ifndef SWD_MAX_CHAIN
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  89) #  define SWD_MAX_CHAIN     2048
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  90) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  91) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  92) #define HEAD3(b, p) \
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  93) 	( ((0x9f5f * ((((b[p]<<5)^b[p+1])<<5) ^ b[p+2])) >> 5) & (SWD_HSIZE-1) )
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  94) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  95) #if defined(LZO_UNALIGNED_OK_2)
-5117eff6f9 archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2013-10-16 14:21:20 +0200  96) #  define HEAD2(b,p)      (* (bb__aliased_uint16_t *) &(b[p]))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  97) #else
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  98) #  define HEAD2(b,p)      (b[p] ^ ((unsigned)b[p+1]<<8))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000  99) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 100) #define NIL2              SWD_UINT_MAX
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 101) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 102) typedef struct lzo_swd {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 103) 	/* public - "built-in" */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 104) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 105) 	/* public - configuration */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 106) 	unsigned max_chain;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 107) 	int use_best_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 108) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 109) 	/* public - output */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 110) 	unsigned m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 111) 	unsigned m_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 112) 	unsigned look;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 113) 	int b_char;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 114) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 115) 	unsigned best_off[SWD_BEST_OFF];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 116) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 117) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 118) 	/* semi public */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 119) 	lzo1x_999_t *c;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 120) 	unsigned m_pos;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 121) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 122) 	unsigned best_pos[SWD_BEST_OFF];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 123) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 124) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 125) 	/* private */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 126) 	unsigned ip;                /* input pointer (lookahead) */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 127) 	unsigned bp;                /* buffer pointer */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 128) 	unsigned rp;                /* remove pointer */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 129) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 130) 	unsigned node_count;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 131) 	unsigned first_rp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 132) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 133) 	uint8_t b[SWD_N + SWD_F];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 134) 	uint8_t b_wrap[SWD_F]; /* must follow b */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 135) 	uint16_t head3[SWD_HSIZE];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 136) 	uint16_t succ3[SWD_N + SWD_F];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 137) 	uint16_t best3[SWD_N + SWD_F];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 138) 	uint16_t llen3[SWD_HSIZE];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 139) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 140) 	uint16_t head2[65536L];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 141) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 142) } lzo_swd_t, *lzo_swd_p;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 143) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 144) #define SIZEOF_LZO_SWD_T    (sizeof(lzo_swd_t))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 145) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 146) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 147) /* Access macro for head3.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 148)  * head3[key] may be uninitialized, but then its value will never be used.
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 149)  */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 150) #define s_get_head3(s,key)    s->head3[key]
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 151) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 152) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 153) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 154) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 155) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 156) #define B_SIZE (SWD_N + SWD_F)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 157) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 158) static int swd_init(lzo_swd_p s)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 159) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 160) 	/* defaults */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 161) 	s->node_count = SWD_N;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 162) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 163) 	memset(s->llen3, 0, sizeof(s->llen3[0]) * (unsigned)SWD_HSIZE);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 164) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 165) 	memset(s->head2, 0xff, sizeof(s->head2[0]) * 65536L);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 166) 	assert(s->head2[0] == NIL2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 167) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 168) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 169) 	s->ip = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 170) 	s->bp = s->ip;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 171) 	s->first_rp = s->ip;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 172) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 173) 	assert(s->ip + SWD_F <= B_SIZE);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 174) 	s->look = (unsigned) (s->c->in_end - s->c->ip);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 175) 	if (s->look > 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 176) 		if (s->look > SWD_F)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 177) 			s->look = SWD_F;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 178) 		memcpy(&s->b[s->ip], s->c->ip, s->look);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 179) 		s->c->ip += s->look;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 180) 		s->ip += s->look;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 181) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 182) 	if (s->ip == B_SIZE)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 183) 		s->ip = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 184) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 185) 	s->rp = s->first_rp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 186) 	if (s->rp >= s->node_count)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 187) 		s->rp -= s->node_count;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 188) 	else
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 189) 		s->rp += B_SIZE - s->node_count;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 190) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 191) 	return LZO_E_OK;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 192) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 193) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 194) #define swd_pos2off(s,pos) \
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 195) 	(s->bp > (pos) ? s->bp - (pos) : B_SIZE - ((pos) - s->bp))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 196) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 197) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 198) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 199) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 200) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 201) static void swd_getbyte(lzo_swd_p s)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 202) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 203) 	int c;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 204) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 205) 	if ((c = getbyte(*(s->c))) < 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 206) 		if (s->look > 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 207) 			--s->look;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 208) 	} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 209) 		s->b[s->ip] = c;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 210) 		if (s->ip < SWD_F)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 211) 			s->b_wrap[s->ip] = c;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 212) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 213) 	if (++s->ip == B_SIZE)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 214) 		s->ip = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 215) 	if (++s->bp == B_SIZE)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 216) 		s->bp = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 217) 	if (++s->rp == B_SIZE)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 218) 		s->rp = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 219) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 220) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 221) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 222) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 223) // remove node from lists
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 224) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 225) static void swd_remove_node(lzo_swd_p s, unsigned node)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 226) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 227) 	if (s->node_count == 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 228) 		unsigned key;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 229) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 230) 		key = HEAD3(s->b,node);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 231) 		assert(s->llen3[key] > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 232) 		--s->llen3[key];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 233) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 234) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 235) 		key = HEAD2(s->b,node);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 236) 		assert(s->head2[key] != NIL2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 237) 		if ((unsigned) s->head2[key] == node)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 238) 			s->head2[key] = NIL2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 239) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 240) 	} else
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 241) 		--s->node_count;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 242) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 243) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 244) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 245) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 246) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 247) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 248) static void swd_accept(lzo_swd_p s, unsigned n)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 249) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 250) 	assert(n <= s->look);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 251) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 252) 	while (n--) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 253) 		unsigned key;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 254) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 255) 		swd_remove_node(s,s->rp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 256) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 257) 		/* add bp into HEAD3 */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 258) 		key = HEAD3(s->b, s->bp);
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 259) 		s->succ3[s->bp] = s_get_head3(s, key);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 260) 		s->head3[key] = s->bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 261) 		s->best3[s->bp] = SWD_F + 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 262) 		s->llen3[key]++;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 263) 		assert(s->llen3[key] <= SWD_N);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 264) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 265) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 266) 		/* add bp into HEAD2 */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 267) 		key = HEAD2(s->b, s->bp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 268) 		s->head2[key] = s->bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 269) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 270) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 271) 		swd_getbyte(s);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 272) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 273) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 274) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 275) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 276) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 277) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 278) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 279) static void swd_search(lzo_swd_p s, unsigned node, unsigned cnt)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 280) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 281) 	const uint8_t *p1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 282) 	const uint8_t *p2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 283) 	const uint8_t *px;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 284) 	unsigned m_len = s->m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 285) 	const uint8_t *b  = s->b;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 286) 	const uint8_t *bp = s->b + s->bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 287) 	const uint8_t *bx = s->b + s->bp + s->look;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 288) 	unsigned char scan_end1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 289) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 290) 	assert(s->m_len > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 291) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 292) 	scan_end1 = bp[m_len - 1];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 293) 	for ( ; cnt-- > 0; node = s->succ3[node]) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 294) 		p1 = bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 295) 		p2 = b + node;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 296) 		px = bx;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 297) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 298) 		assert(m_len < s->look);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 299) 
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 300) 		if (p2[m_len - 1] == scan_end1
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 301) 		 && p2[m_len] == p1[m_len]
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 302) 		 && p2[0] == p1[0]
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 303) 		 && p2[1] == p1[1]
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 304) 		) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 305) 			unsigned i;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 306) 			assert(lzo_memcmp(bp, &b[node], 3) == 0);
-9038d6f8f5 archival/lzo1x_9x.c            (Denys Vlasenko 2009-07-15 20:02:19 +0200 307) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 308) 			p1 += 2; p2 += 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 309) 			do {} while (++p1 < px && *p1 == *++p2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 310) 			i = p1-bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 311) 
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 312) 			assert(lzo_memcmp(bp, &b[node], i) == 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 313) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 314) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 315) 			if (i < SWD_BEST_OFF) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 316) 				if (s->best_pos[i] == 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 317) 					s->best_pos[i] = node + 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 318) 			}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 319) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 320) 			if (i > m_len) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 321) 				s->m_len = m_len = i;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 322) 				s->m_pos = node;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 323) 				if (m_len == s->look)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 324) 					return;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 325) 				if (m_len >= SWD_F)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 326) 					return;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 327) 				if (m_len > (unsigned) s->best3[node])
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 328) 					return;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 329) 				scan_end1 = bp[m_len - 1];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 330) 			}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 331) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 332) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 333) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 334) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 335) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 336) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 337) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 338) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 339) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 340) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 341) static int swd_search2(lzo_swd_p s)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 342) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 343) 	unsigned key;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 344) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 345) 	assert(s->look >= 2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 346) 	assert(s->m_len > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 347) 
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 348) 	key = s->head2[HEAD2(s->b, s->bp)];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 349) 	if (key == NIL2)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 350) 		return 0;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 351) 	assert(lzo_memcmp(&s->b[s->bp], &s->b[key], 2) == 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 352) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 353) 	if (s->best_pos[2] == 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 354) 		s->best_pos[2] = key + 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 355) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 356) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 357) 	if (s->m_len < 2) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 358) 		s->m_len = 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 359) 		s->m_pos = key;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 360) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 361) 	return 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 362) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 363) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 364) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 365) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 366) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 367) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 368) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 369) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 370) static void swd_findbest(lzo_swd_p s)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 371) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 372) 	unsigned key;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 373) 	unsigned cnt, node;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 374) 	unsigned len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 375) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 376) 	assert(s->m_len > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 377) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 378) 	/* get current head, add bp into HEAD3 */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 379) 	key = HEAD3(s->b,s->bp);
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 380) 	node = s->succ3[s->bp] = s_get_head3(s, key);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 381) 	cnt = s->llen3[key]++;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 382) 	assert(s->llen3[key] <= SWD_N + SWD_F);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 383) 	if (cnt > s->max_chain)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 384) 		cnt = s->max_chain;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 385) 	s->head3[key] = s->bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 386) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 387) 	s->b_char = s->b[s->bp];
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 388) 	len = s->m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 389) 	if (s->m_len >= s->look) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 390) 		if (s->look == 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 391) 			s->b_char = -1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 392) 		s->m_off = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 393) 		s->best3[s->bp] = SWD_F + 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 394) 	} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 395) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 396) 		if (swd_search2(s))
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 397) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 398) 			if (s->look >= 3)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 399) 				swd_search(s, node, cnt);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 400) 		if (s->m_len > len)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 401) 			s->m_off = swd_pos2off(s,s->m_pos);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 402) 		s->best3[s->bp] = s->m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 403) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 404) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 405) 		if (s->use_best_off) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 406) 			int i;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 407) 			for (i = 2; i < SWD_BEST_OFF; i++) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 408) 				if (s->best_pos[i] > 0)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 409) 					s->best_off[i] = swd_pos2off(s, s->best_pos[i]-1);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 410) 				else
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 411) 					s->best_off[i] = 0;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 412) 			}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 413) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 414) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 415) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 416) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 417) 	swd_remove_node(s,s->rp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 418) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 419) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 420) 	/* add bp into HEAD2 */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 421) 	key = HEAD2(s->b, s->bp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 422) 	s->head2[key] = s->bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 423) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 424) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 425) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 426) #undef HEAD3
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 427) #undef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 428) #undef s_get_head3
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 429) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 430) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 431) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 432) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 433) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 434) static int init_match(lzo1x_999_t *c, lzo_swd_p s, uint32_t use_best_off)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 435) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 436) 	int r;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 437) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 438) 	assert(!c->init);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 439) 	c->init = 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 440) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 441) 	s->c = c;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 442) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 443) 	r = swd_init(s);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 444) 	if (r != 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 445) 		return r;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 446) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 447) 	s->use_best_off = use_best_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 448) 	return r;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 449) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 450) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 451) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 452) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 453) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 454) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 455) static int find_match(lzo1x_999_t *c, lzo_swd_p s,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 456) 		unsigned this_len, unsigned skip)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 457) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 458) 	assert(c->init);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 459) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 460) 	if (skip > 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 461) 		assert(this_len >= skip);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 462) 		swd_accept(s, this_len - skip);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 463) 	} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 464) 		assert(this_len <= 1);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 465) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 466) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 467) 	s->m_len = 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 468) #ifdef SWD_BEST_OFF
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 469) 	if (s->use_best_off)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 470) 		memset(s->best_pos, 0, sizeof(s->best_pos));
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 471) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 472) 	swd_findbest(s);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 473) 	c->m_len = s->m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 474) 	c->m_off = s->m_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 475) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 476) 	swd_getbyte(s);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 477) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 478) 	if (s->b_char < 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 479) 		c->look = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 480) 		c->m_len = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 481) 	} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 482) 		c->look = s->look + 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 483) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 484) 	c->bp = c->ip - c->look;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 485) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 486) 	return LZO_E_OK;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 487) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 488) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 489) /* this is a public functions, but there is no prototype in a header file */
-3d27d435db archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2018-12-27 18:03:20 +0100 490) static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 491) 		uint8_t *out, unsigned *out_len,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 492) 		void *wrkmem,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 493) 		unsigned good_length,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 494) 		unsigned max_lazy,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 495) 		unsigned max_chain,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 496) 		uint32_t use_best_off);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 497) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 498) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 499) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 500) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 501) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 502) static uint8_t *code_match(lzo1x_999_t *c,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 503) 		uint8_t *op, unsigned m_len, unsigned m_off)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 504) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 505) 	assert(op > c->out);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 506) 	if (m_len == 2) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 507) 		assert(m_off <= M1_MAX_OFFSET);
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 508) 		assert(c->r1_lit > 0);
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 509) 		assert(c->r1_lit < 4);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 510) 		m_off -= 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 511) 		*op++ = M1_MARKER | ((m_off & 3) << 2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 512) 		*op++ = m_off >> 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 513) 	} else if (m_len <= M2_MAX_LEN && m_off <= M2_MAX_OFFSET) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 514) 		assert(m_len >= 3);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 515) 		m_off -= 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 516) 		*op++ = ((m_len - 1) << 5) | ((m_off & 7) << 2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 517) 		*op++ = m_off >> 3;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 518) 		assert(op[-2] >= M2_MARKER);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 519) 	} else if (m_len == M2_MIN_LEN && m_off <= MX_MAX_OFFSET && c->r1_lit >= 4) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 520) 		assert(m_len == 3);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 521) 		assert(m_off > M2_MAX_OFFSET);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 522) 		m_off -= 1 + M2_MAX_OFFSET;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 523) 		*op++ = M1_MARKER | ((m_off & 3) << 2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 524) 		*op++ = m_off >> 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 525) 	} else if (m_off <= M3_MAX_OFFSET) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 526) 		assert(m_len >= 3);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 527) 		m_off -= 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 528) 		if (m_len <= M3_MAX_LEN)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 529) 			*op++ = M3_MARKER | (m_len - 2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 530) 		else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 531) 			m_len -= M3_MAX_LEN;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 532) 			*op++ = M3_MARKER | 0;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 533) 			while (m_len > 255) {
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 534) 				m_len -= 255;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 535) 				*op++ = 0;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 536) 			}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 537) 			assert(m_len > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 538) 			*op++ = m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 539) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 540) 		*op++ = m_off << 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 541) 		*op++ = m_off >> 6;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 542) 	} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 543) 		unsigned k;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 544) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 545) 		assert(m_len >= 3);
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 546) 		assert(m_off > 0x4000);
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 547) 		assert(m_off <= 0xbfff);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 548) 		m_off -= 0x4000;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 549) 		k = (m_off & 0x4000) >> 11;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 550) 		if (m_len <= M4_MAX_LEN)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 551) 			*op++ = M4_MARKER | k | (m_len - 2);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 552) 		else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 553) 			m_len -= M4_MAX_LEN;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 554) 			*op++ = M4_MARKER | k | 0;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 555) 			while (m_len > 255) {
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 556) 				m_len -= 255;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 557) 				*op++ = 0;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 558) 			}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 559) 			assert(m_len > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 560) 			*op++ = m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 561) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 562) 		*op++ = m_off << 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 563) 		*op++ = m_off >> 6;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 564) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 565) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 566) 	return op;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 567) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 568) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 569) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 570) static uint8_t *STORE_RUN(lzo1x_999_t *c, uint8_t *op,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 571) 		const uint8_t *ii, unsigned t)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 572) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 573) 	if (op == c->out && t <= 238) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 574) 		*op++ = 17 + t;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 575) 	} else if (t <= 3) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 576) 		op[-2] |= t;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 577) 	} else if (t <= 18) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 578) 		*op++ = t - 3;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 579) 	} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 580) 		unsigned tt = t - 18;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 581) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 582) 		*op++ = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 583) 		while (tt > 255) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 584) 			tt -= 255;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 585) 			*op++ = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 586) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 587) 		assert(tt > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 588) 		*op++ = tt;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 589) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 590) 	do *op++ = *ii++; while (--t > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 591) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 592) 	return op;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 593) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 594) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 595) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 596) static uint8_t *code_run(lzo1x_999_t *c, uint8_t *op, const uint8_t *ii,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 597) 		unsigned lit)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 598) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 599) 	if (lit > 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 600) 		assert(m_len >= 2);
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 601) 		op = STORE_RUN(c, op, ii, lit);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 602) 	} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 603) 		assert(m_len >= 3);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 604) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 605) 	c->r1_lit = lit;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 606) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 607) 	return op;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 608) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 609) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 610) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 611) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 612) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 613) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 614) static int len_of_coded_match(unsigned m_len, unsigned m_off, unsigned lit)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 615) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 616) 	int n = 4;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 617) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 618) 	if (m_len < 2)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 619) 		return -1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 620) 	if (m_len == 2)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 621) 		return (m_off <= M1_MAX_OFFSET && lit > 0 && lit < 4) ? 2 : -1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 622) 	if (m_len <= M2_MAX_LEN && m_off <= M2_MAX_OFFSET)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 623) 		return 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 624) 	if (m_len == M2_MIN_LEN && m_off <= MX_MAX_OFFSET && lit >= 4)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 625) 		return 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 626) 	if (m_off <= M3_MAX_OFFSET) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 627) 		if (m_len <= M3_MAX_LEN)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 628) 			return 3;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 629) 		m_len -= M3_MAX_LEN;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 630) 	} else if (m_off <= M4_MAX_OFFSET) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 631) 		if (m_len <= M4_MAX_LEN)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 632) 			return 3;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 633) 		m_len -= M4_MAX_LEN;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 634) 	} else
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 635) 		return -1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 636) 	while (m_len > 255) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 637) 		m_len -= 255;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 638) 		n++;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 639) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 640) 	return n;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 641) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 642) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 643) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 644) static int min_gain(unsigned ahead, unsigned lit1,
-60cb48ca50 archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2013-01-14 15:57:44 +0100 645) 			unsigned lit2, int l1, int l2, int l3)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 646) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 647) 	int lazy_match_min_gain = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 648) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 649) 	assert (ahead >= 1);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 650) 	lazy_match_min_gain += ahead;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 651) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 652) 	if (lit1 <= 3)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 653) 		lazy_match_min_gain += (lit2 <= 3) ? 0 : 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 654) 	else if (lit1 <= 18)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 655) 		lazy_match_min_gain += (lit2 <= 18) ? 0 : 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 656) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 657) 	lazy_match_min_gain += (l2 - l1) * 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 658) 	if (l3 > 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 659) 		lazy_match_min_gain -= (ahead - l3) * 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 660) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 661) 	if (lazy_match_min_gain < 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 662) 		lazy_match_min_gain = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 663) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 664) 	return lazy_match_min_gain;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 665) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 666) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 667) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 668) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 669) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 670) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 671) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 672) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 673) static void better_match(const lzo_swd_p swd,
-60cb48ca50 archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2013-01-14 15:57:44 +0100 674) 			unsigned *m_len, unsigned *m_off)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 675) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 676) 	if (*m_len <= M2_MIN_LEN)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 677) 		return;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 678) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 679) 	if (*m_off <= M2_MAX_OFFSET)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 680) 		return;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 681) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 682) 	/* M3/M4 -> M2 */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 683) 	if (*m_off > M2_MAX_OFFSET
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 684) 	 && *m_len >= M2_MIN_LEN + 1 && *m_len <= M2_MAX_LEN + 1
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 685) 	 && swd->best_off[*m_len-1] && swd->best_off[*m_len-1] <= M2_MAX_OFFSET
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 686) 	) {
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 687) 		*m_len = *m_len - 1;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 688) 		*m_off = swd->best_off[*m_len];
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 689) 		return;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 690) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 691) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 692) 	/* M4 -> M2 */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 693) 	if (*m_off > M3_MAX_OFFSET
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 694) 	 && *m_len >= M4_MAX_LEN + 1 && *m_len <= M2_MAX_LEN + 2
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 695) 	 && swd->best_off[*m_len-2] && swd->best_off[*m_len-2] <= M2_MAX_OFFSET
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 696) 	) {
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 697) 		*m_len = *m_len - 2;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 698) 		*m_off = swd->best_off[*m_len];
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 699) 		return;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 700) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 701) 	/* M4 -> M3 */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 702) 	if (*m_off > M3_MAX_OFFSET
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 703) 	 && *m_len >= M4_MAX_LEN + 1 && *m_len <= M3_MAX_LEN + 1
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 704) 	 && swd->best_off[*m_len-1] && swd->best_off[*m_len-1] <= M3_MAX_OFFSET
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 705) 	) {
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 706) 		*m_len = *m_len - 1;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 707) 		*m_off = swd->best_off[*m_len];
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 708) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 709) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 710) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 711) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 712) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 713) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 714) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 715) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 716) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 717) static int lzo1x_999_compress_internal(const uint8_t *in, unsigned in_len,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 718) 		uint8_t *out, unsigned *out_len,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 719) 		void *wrkmem,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 720) 		unsigned good_length,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 721) 		unsigned max_lazy,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 722) 		unsigned max_chain,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 723) 		uint32_t use_best_off)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 724) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 725) 	uint8_t *op;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 726) 	const uint8_t *ii;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 727) 	unsigned lit;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 728) 	unsigned m_len, m_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 729) 	lzo1x_999_t cc;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 730) 	lzo1x_999_t *const c = &cc;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 731) 	const lzo_swd_p swd = (lzo_swd_p) wrkmem;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 732) 	int r;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 733) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 734) 	c->init = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 735) 	c->ip = c->in = in;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 736) 	c->in_end = in + in_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 737) 	c->out = out;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 738) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 739) 	op = out;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 740) 	ii = c->ip;             /* point to start of literal run */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 741) 	lit = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 742) 	c->r1_lit = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 743) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 744) 	r = init_match(c, swd, use_best_off);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 745) 	if (r != 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 746) 		return r;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 747) 	swd->max_chain = max_chain;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 748) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 749) 	r = find_match(c, swd, 0, 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 750) 	if (r != 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 751) 		return r;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 752) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 753) 	while (c->look > 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 754) 		unsigned ahead;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 755) 		unsigned max_ahead;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 756) 		int l1, l2, l3;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 757) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 758) 		m_len = c->m_len;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 759) 		m_off = c->m_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 760) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 761) 		assert(c->bp == c->ip - c->look);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 762) 		assert(c->bp >= in);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 763) 		if (lit == 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 764) 			ii = c->bp;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 765) 		assert(ii + lit == c->bp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 766) 		assert(swd->b_char == *(c->bp));
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 767) 
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 768) 		if (m_len < 2
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 769) 		 || (m_len == 2 && (m_off > M1_MAX_OFFSET || lit == 0 || lit >= 4))
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 770) 		    /* Do not accept this match for compressed-data compatibility
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 771) 		     * with LZO v1.01 and before
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 772) 		     * [ might be a problem for decompress() and optimize() ]
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 773) 		     */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 774) 		 || (m_len == 2 && op == out)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 775) 		 || (op == out && lit == 0)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 776) 		) {
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 777) 			/* a literal */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 778) 			m_len = 0;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 779) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 780) 		else if (m_len == M2_MIN_LEN) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 781) 			/* compression ratio improves if we code a literal in some cases */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 782) 			if (m_off > MX_MAX_OFFSET && lit >= 4)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 783) 				m_len = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 784) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 785) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 786) 		if (m_len == 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 787) 			/* a literal */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 788) 			lit++;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 789) 			swd->max_chain = max_chain;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 790) 			r = find_match(c, swd, 1, 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 791) 			assert(r == 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 792) 			continue;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 793) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 794) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 795) 		/* a match */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 796) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 797) 		if (swd->use_best_off)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 798) 			better_match(swd, &m_len, &m_off);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 799) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 800) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 801) 		/* shall we try a lazy match ? */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 802) 		ahead = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 803) 		if (m_len >= max_lazy) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 804) 			/* no */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 805) 			l1 = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 806) 			max_ahead = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 807) 		} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 808) 			/* yes, try a lazy match */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 809) 			l1 = len_of_coded_match(m_len, m_off, lit);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 810) 			assert(l1 > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 811) 			max_ahead = LZO_MIN(2, (unsigned)l1 - 1);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 812) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 813) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 814) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 815) 		while (ahead < max_ahead && c->look > m_len) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 816) 			int lazy_match_min_gain;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 817) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 818) 			if (m_len >= good_length)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 819) 				swd->max_chain = max_chain >> 2;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 820) 			else
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 821) 				swd->max_chain = max_chain;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 822) 			r = find_match(c, swd, 1, 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 823) 			ahead++;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 824) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 825) 			assert(r == 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 826) 			assert(c->look > 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 827) 			assert(ii + lit + ahead == c->bp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 828) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 829) 			if (c->m_len < m_len)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 830) 				continue;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 831) 			if (c->m_len == m_len && c->m_off >= m_off)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 832) 				continue;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 833) #if defined(SWD_BEST_OFF)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 834) 			if (swd->use_best_off)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 835) 				better_match(swd, &c->m_len, &c->m_off);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 836) #endif
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 837) 			l2 = len_of_coded_match(c->m_len, c->m_off, lit+ahead);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 838) 			if (l2 < 0)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 839) 				continue;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 840) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 841) 			/* compressed-data compatibility [see above] */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 842) 			l3 = (op == out) ? -1 : len_of_coded_match(ahead, m_off, lit);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 843) 
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 844) 			lazy_match_min_gain = min_gain(ahead, lit, lit+ahead, l1, l2, l3);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 845) 			if (c->m_len >= m_len + lazy_match_min_gain) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 846) 				if (l3 > 0) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 847) 					/* code previous run */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 848) 					op = code_run(c, op, ii, lit);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 849) 					lit = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 850) 					/* code shortened match */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 851) 					op = code_match(c, op, ahead, m_off);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 852) 				} else {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 853) 					lit += ahead;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 854) 					assert(ii + lit == c->bp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 855) 				}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 856) 				goto lazy_match_done;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 857) 			}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 858) 		}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 859) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 860) 		assert(ii + lit + ahead == c->bp);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 861) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 862) 		/* 1 - code run */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 863) 		op = code_run(c, op, ii, lit);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 864) 		lit = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 865) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 866) 		/* 2 - code match */
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 867) 		op = code_match(c, op, m_len, m_off);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 868) 		swd->max_chain = max_chain;
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 869) 		r = find_match(c, swd, m_len, 1+ahead);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 870) 		assert(r == 0);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 871) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 872)  lazy_match_done: ;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 873) 	}
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 874) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 875) 	/* store final run */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 876) 	if (lit > 0)
-6b9f163353 archival/lzo1x_9x.c            (Denys Vlasenko 2010-01-28 02:24:24 +0100 877) 		op = STORE_RUN(c, op, ii, lit);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 878) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 879) #if defined(LZO_EOF_CODE)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 880) 	*op++ = M4_MARKER | 1;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 881) 	*op++ = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 882) 	*op++ = 0;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 883) #endif
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 884) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 885) 	*out_len = op - out;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 886) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 887) 	return LZO_E_OK;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 888) }
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 889) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 890) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 891) /***********************************************************************
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 892) //
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 893) ************************************************************************/
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 894) int lzo1x_999_compress_level(const uint8_t *in, unsigned in_len,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 895) 		uint8_t *out, unsigned *out_len,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 896) 		void *wrkmem,
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 897) 		int compression_level)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 898) {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 899) 	static const struct {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 900) 		uint16_t good_length;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 901) 		uint16_t max_lazy;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 902) 		uint16_t max_chain;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 903) 		uint16_t use_best_off;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 904) 	} c[3] = {
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 905) 		{     8,    32,  256,   0 },
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 906) 		{    32,   128, 2048,   1 },
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 907) 		{ SWD_F, SWD_F, 4096,   1 }       /* max. compression */
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 908) 	};
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 909) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 910) 	if (compression_level < 7 || compression_level > 9)
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 911) 		return LZO_E_ERROR;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 912) 
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 913) 	compression_level -= 7;
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 914) 	return lzo1x_999_compress_internal(in, in_len, out, out_len, wrkmem,
-60cb48ca50 archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2013-01-14 15:57:44 +0100 915) 					c[compression_level].good_length,
-60cb48ca50 archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2013-01-14 15:57:44 +0100 916) 					c[compression_level].max_lazy,
-60cb48ca50 archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2013-01-14 15:57:44 +0100 917) 					c[compression_level].max_chain,
-60cb48ca50 archival/libarchive/lzo1x_9x.c (Denys Vlasenko 2013-01-14 15:57:44 +0100 918) 					c[compression_level].use_best_off);
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 919) }
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   1) /* Based on ipsvd utilities written by Gerrit Pape <pape@smarden.org>
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   2)  * which are released into public domain by the author.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   3)  * Homepage: http://smarden.sunsite.dk/ipsvd/
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   4)  *
+d18f52bd18 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-02 12:53:15 +0000   5)  * Copyright (C) 2007 Denys Vlasenko.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   6)  *
+0ef64bdb40 networking/tcpudp.c (Denys Vlasenko           2010-08-16 20:14:46 +0200   7)  * Licensed under GPLv2, see file LICENSE in this source tree.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   8)  */
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   9) 
+4866e905d7 networking/tcpudp.c (Denis Vlasenko           2008-03-17 09:17:27 +0000  10) /* Based on ipsvd-0.12.1. This tcpsvd accepts all options
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  11)  * which are supported by one from ipsvd-0.12.1, but not all are
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  12)  * functional. See help text at the end of this file for details.
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  13)  *
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  14)  * Code inside "#ifdef SSLSVD" is for sslsvd and is currently unused.
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  15)  *
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  16)  * Busybox version exports TCPLOCALADDR instead of
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  17)  * TCPLOCALIP + TCPLOCALPORT pair. ADDR more closely matches reality
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  18)  * (which is "struct sockaddr_XXX". Port is not a separate entity,
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  19)  * it's just a part of (AF_INET[6]) sockaddr!).
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  20)  *
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  21)  * TCPORIGDSTADDR is Busybox-specific addition.
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  22)  *
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  23)  * udp server is hacked up by reusing TCP code. It has the following
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  24)  * limitation inherent in Unix DGRAM sockets implementation:
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000  25)  * - local IP address is retrieved (using recvmsg voodoo) but
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  26)  *   child's socket is not bound to it (bind cannot be called on
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000  27)  *   already bound socket). Thus it still can emit outgoing packets
+beaca811e4 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-13 16:32:26 +0000  28)  *   with wrong source IP...
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  29)  * - don't know how to retrieve ORIGDST for udp.
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  30)  */
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  31) //config:config TCPSVD
+b097a84d62 networking/tcpudp.c (Denys Vlasenko           2018-12-28 03:20:17 +0100  32) //config:	bool "tcpsvd (14 kb)"
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  33) //config:	default y
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  34) //config:	help
+72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  35) //config:	tcpsvd listens on a TCP port and runs a program for each new
+72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  36) //config:	connection.
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  37) //config:
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  38) //config:config UDPSVD
+4eed2c6c50 networking/tcpudp.c (Denys Vlasenko           2017-07-18 22:01:24 +0200  39) //config:	bool "udpsvd (13 kb)"
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  40) //config:	default y
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  41) //config:	help
+72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  42) //config:	udpsvd listens on an UDP port and runs a program for each new
+72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  43) //config:	connection.
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  44) 
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  45) //applet:IF_TCPSVD(APPLET_ODDNAME(tcpsvd, tcpudpsvd, BB_DIR_USR_BIN, BB_SUID_DROP, tcpsvd))
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  46) //applet:IF_UDPSVD(APPLET_ODDNAME(udpsvd, tcpudpsvd, BB_DIR_USR_BIN, BB_SUID_DROP, udpsvd))
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  47) 
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  48) //kbuild:lib-$(CONFIG_TCPSVD) += tcpudp.o tcpudp_perhost.o
+47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  49) //kbuild:lib-$(CONFIG_UDPSVD) += tcpudp.o tcpudp_perhost.o
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  50) 
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  51) //usage:#define tcpsvd_trivial_usage
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  52) //usage:       "[-hEv] [-c N] [-C N[:MSG]] [-b N] [-u USER] [-l NAME] IP PORT PROG"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  53) /* with not-implemented options: */
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  54) /* //usage:    "[-hpEvv] [-c N] [-C N[:MSG]] [-b N] [-u USER] [-l NAME] [-i DIR|-x CDB] [-t SEC] IP PORT PROG" */
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  55) //usage:#define tcpsvd_full_usage "\n\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  56) //usage:       "Create TCP socket, bind to IP:PORT and listen for incoming connections.\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  57) //usage:       "Run PROG for each connection.\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  58) //usage:     "\n	IP PORT		IP:PORT to listen on"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  59) //usage:     "\n	PROG ARGS	Program to run"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  60) //usage:     "\n	-u USER[:GRP]	Change to user/group after bind"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  61) //usage:     "\n	-c N		Up to N connections simultaneously (default 30)"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  62) //usage:     "\n	-b N		Allow backlog of approximately N TCP SYNs (default 20)"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  63) //usage:     "\n	-C N[:MSG]	Allow only up to N connections from the same IP:"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  64) //usage:     "\n			new connections from this IP address are closed"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  65) //usage:     "\n			immediately, MSG is written to the peer before close"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  66) //usage:     "\n	-E		Don't set up environment"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  67) //usage:     "\n	-h		Look up peer's hostname"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  68) //usage:     "\n	-l NAME		Local hostname (else look up local hostname in DNS)"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  69) //usage:     "\n	-v		Verbose"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  70) //usage:     "\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  71) //usage:     "\nEnvironment if no -E:"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  72) //usage:     "\nPROTO='TCP'"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  73) //usage:     "\nTCPREMOTEADDR='ip:port'" IF_FEATURE_IPV6(" ('[ip]:port' for IPv6)")
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  74) //usage:     "\nTCPLOCALADDR='ip:port'"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  75) //usage:     "\nTCPORIGDSTADDR='ip:port' of destination before firewall"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  76) //usage:     "\n	Useful for REDIRECTed-to-local connections:"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  77) //usage:     "\n	iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to 8080"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  78) //usage:     "\nTCPCONCURRENCY=num_of_connects_from_this_ip"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  79) //usage:     "\nIf -h:"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  80) //usage:     "\nTCPLOCALHOST='hostname' (-l NAME is used if specified)"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  81) //usage:     "\nTCPREMOTEHOST='hostname'"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  82) 
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  83) //usage:
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  84) //usage:#define udpsvd_trivial_usage
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  85) //usage:       "[-hEv] [-c N] [-u USER] [-l NAME] IP PORT PROG"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  86) //usage:#define udpsvd_full_usage "\n\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  87) //usage:       "Create UDP socket, bind to IP:PORT and wait for incoming packets.\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  88) //usage:       "Run PROG for each packet, redirecting all further packets with same\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  89) //usage:       "peer ip:port to it.\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  90) //usage:     "\n	IP PORT		IP:PORT to listen on"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  91) //usage:     "\n	PROG ARGS	Program to run"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  92) //usage:     "\n	-u USER[:GRP]	Change to user/group after bind"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  93) //usage:     "\n	-c N		Up to N connections simultaneously (default 30)"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  94) //usage:     "\n	-E		Don't set up environment"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  95) //usage:     "\n	-h		Look up peer's hostname"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  96) //usage:     "\n	-l NAME		Local hostname (else look up local hostname in DNS)"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  97) //usage:     "\n	-v		Verbose"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  98) //usage:     "\n"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  99) //usage:     "\nEnvironment if no -E:"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 100) //usage:     "\nPROTO='UDP'"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 101) //usage:     "\nUDPREMOTEADDR='ip:port'" IF_FEATURE_IPV6(" ('[ip]:port' for IPv6)")
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 102) //usage:     "\nUDPLOCALADDR='ip:port'"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 103) //usage:     "\nIf -h:"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 104) //usage:     "\nUDPLOCALHOST='hostname' (-l NAME is used if specified)"
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 105) //usage:     "\nUDPREMOTEHOST='hostname'"
+5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200 106) 
+b6adbf1be2 ipsvd/tcpudp.c      (Denis Vlasenko           2007-05-26 19:00:18 +0000 107) #include "libbb.h"
+e6a2f4cc5a networking/tcpudp.c (Denys Vlasenko           2016-04-21 16:26:30 +0200 108) #include "common_bufsiz.h"
+2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 109) 
+2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 110) #ifdef __linux__
+7890035452 networking/tcpudp.c (Denys Vlasenko           2017-01-02 10:46:08 +0100 111) /* from linux/netfilter_ipv4.h: */
+7890035452 networking/tcpudp.c (Denys Vlasenko           2017-01-02 10:46:08 +0100 112) # undef  SO_ORIGINAL_DST
+7890035452 networking/tcpudp.c (Denys Vlasenko           2017-01-02 10:46:08 +0100 113) # define SO_ORIGINAL_DST 80
+2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 114) #endif
+165f5b394f networking/tcpudp.c (Denis Vlasenko           2008-03-31 20:30:38 +0000 115) 
+4866e905d7 networking/tcpudp.c (Denis Vlasenko           2008-03-17 09:17:27 +0000 116) // TODO: move into this file:
+4866e905d7 networking/tcpudp.c (Denis Vlasenko           2008-03-17 09:17:27 +0000 117) #include "tcpudp_perhost.h"
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 118) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 119) #ifdef SSLSVD
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 120) #include "matrixSsl.h"
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 121) #include "ssl_io.h"
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 122) #endif
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 123) 
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 124) struct globals {
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 125) 	unsigned verbose;
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 126) 	unsigned max_per_host;
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 127) 	unsigned cur_per_host;
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 128) 	unsigned cnum;
+3f5fdc7572 ipsvd/tcpudp.c      (Denis Vlasenko           2007-10-14 04:55:59 +0000 129) 	unsigned cmax;
+d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 130) 	struct hcc *cc;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 131) 	char **env_cur;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 132) 	char *env_var[1]; /* actually bigger */
+98a4c7cf3d networking/tcpudp.c (Denys Vlasenko           2010-02-04 15:00:15 +0100 133) } FIX_ALIASING;
+e6a2f4cc5a networking/tcpudp.c (Denys Vlasenko           2016-04-21 16:26:30 +0200 134) #define G (*(struct globals*)bb_common_bufsiz1)
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 135) #define verbose      (G.verbose     )
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 136) #define max_per_host (G.max_per_host)
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 137) #define cur_per_host (G.cur_per_host)
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 138) #define cnum         (G.cnum        )
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 139) #define cmax         (G.cmax        )
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 140) #define env_cur      (G.env_cur     )
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 141) #define env_var      (G.env_var     )
+7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 142) #define INIT_G() do { \
+47cfbf32fd networking/tcpudp.c (Denys Vlasenko           2016-04-21 18:18:48 +0200 143) 	setup_common_bufsiz(); \
+7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 144) 	cmax = 30; \
+7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 145) 	env_cur = &env_var[0]; \
+7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 146) } while (0)
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 147) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 148) 
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 149) /* We have to be careful about leaking memory in repeated setenv's */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 150) static void xsetenv_plain(const char *n, const char *v)
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 151) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 152) 	char *var = xasprintf("%s=%s", n, v);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 153) 	*env_cur++ = var;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 154) 	putenv(var);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 155) }
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 156) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 157) static void xsetenv_proto(const char *proto, const char *n, const char *v)
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 158) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 159) 	char *var = xasprintf("%s%s=%s", proto, n, v);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 160) 	*env_cur++ = var;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 161) 	putenv(var);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 162) }
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 163) 
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 164) static void undo_xsetenv(void)
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 165) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 166) 	char **pp = env_cur = &env_var[0];
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 167) 	while (*pp) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 168) 		char *var = *pp;
+dd8adde386 networking/tcpudp.c (Denys Vlasenko           2010-06-24 05:00:50 +0200 169) 		bb_unsetenv_and_free(var);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 170) 		*pp++ = NULL;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 171) 	}
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 172) }
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 173) 
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 174) static void sig_term_handler(int sig)
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 175) {
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 176) 	if (verbose)
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 177) 		bb_error_msg("got signal %u, exit", sig);
+400d8bb45e ipsvd/tcpudp.c      (Denis Vlasenko           2008-02-24 13:36:01 +0000 178) 	kill_myself_with_sig(sig);
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 179) }
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 180) 
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 181) /* Little bloated, but tries to give accurate info how child exited.
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 182)  * Makes easier to spot segfaulting children etc... */
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 183) static void print_waitstat(unsigned pid, int wstat)
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 184) {
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 185) 	unsigned e = 0;
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 186) 	const char *cause = "?exit";
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 187) 
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 188) 	if (WIFEXITED(wstat)) {
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 189) 		cause++;
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 190) 		e = WEXITSTATUS(wstat);
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 191) 	} else if (WIFSIGNALED(wstat)) {
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 192) 		cause = "signal";
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 193) 		e = WTERMSIG(wstat);
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 194) 	}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 195) 	bb_error_msg("end %d %s %d", pid, cause, e);
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 196) }
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 197) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 198) /* Must match getopt32 in main! */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 199) enum {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 200) 	OPT_c = (1 << 0),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 201) 	OPT_C = (1 << 1),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 202) 	OPT_i = (1 << 2),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 203) 	OPT_x = (1 << 3),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 204) 	OPT_u = (1 << 4),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 205) 	OPT_l = (1 << 5),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 206) 	OPT_E = (1 << 6),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 207) 	OPT_b = (1 << 7),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 208) 	OPT_h = (1 << 8),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 209) 	OPT_p = (1 << 9),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 210) 	OPT_t = (1 << 10),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 211) 	OPT_v = (1 << 11),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 212) 	OPT_V = (1 << 12),
+57a426b15b ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 10:59:33 +0000 213) 	OPT_U = (1 << 13), /* from here: sslsvd only */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 214) 	OPT_slash = (1 << 14),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 215) 	OPT_Z = (1 << 15),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 216) 	OPT_K = (1 << 16),
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 217) };
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 218) 
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 219) static void if_verbose_print_connection_status(void)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 220) {
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 221) 	if (verbose) {
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 222) 		/* "only 1 client max" desn't need this */
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 223) 		if (cmax > 1)
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 224) 			bb_error_msg("status %u/%u", cnum, cmax);
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 225) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 226) }
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 227) 
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 228) /* SIGCHLD handler is reentrancy-safe because SIGCHLD is unmasked
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 229)  * only over accept() or recvfrom() calls, not over memory allocations
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 230)  * or printouts. Do need to save/restore errno in order not to mangle
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 231)  * these syscalls' error code, if any.
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 232)  */
+a60f84ebf0 networking/tcpudp.c (Denis Vlasenko           2008-07-05 09:18:54 +0000 233) static void sig_child_handler(int sig UNUSED_PARAM)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 234) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 235) 	int wstat;
+3854c5ddf4 networking/tcpudp.c (Denis Vlasenko           2008-11-06 22:39:57 +0000 236) 	pid_t pid;
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 237) 	int sv_errno = errno;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 238) 
+fb0eba706c ipsvd/tcpudp.c      (Denis Vlasenko           2008-01-02 19:55:04 +0000 239) 	while ((pid = wait_any_nohang(&wstat)) > 0) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 240) 		if (max_per_host)
+d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 241) 			ipsvd_perhost_remove(G.cc, pid);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 242) 		if (cnum)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 243) 			cnum--;
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 244) 		if (verbose)
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 245) 			print_waitstat(pid, wstat);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 246) 	}
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 247) 	if_verbose_print_connection_status();
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 248) 	errno = sv_errno;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 249) }
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 250) 
+9b49a5ed85 ipsvd/tcpudp.c      (Denis Vlasenko           2007-10-11 10:05:36 +0000 251) int tcpudpsvd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+a60f84ebf0 networking/tcpudp.c (Denis Vlasenko           2008-07-05 09:18:54 +0000 252) int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 253) {
+1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 254) 	char *str_C, *str_t;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 255) 	char *user;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 256) 	struct hcc *hccp;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 257) 	const char *instructs;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 258) 	char *msg_per_host = NULL;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 259) 	unsigned len_per_host = len_per_host; /* gcc */
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 260) #ifndef SSLSVD
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 261) 	struct bb_uidgid_t ugid;
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 262) #endif
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 263) 	bool tcp;
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 264) 	uint16_t local_port;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 265) 	char *preset_local_hostname = NULL;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 266) 	char *remote_hostname = remote_hostname; /* for compiler */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 267) 	char *remote_addr = remote_addr; /* for compiler */
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 268) 	len_and_sockaddr *lsa;
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 269) 	len_and_sockaddr local, remote;
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 270) 	socklen_t sa_len;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 271) 	int pid;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 272) 	int sock;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 273) 	int conn;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 274) 	unsigned backlog = 20;
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 275) 	unsigned opts;
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 276) 
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 277) 	INIT_G();
+b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 278) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 279) 	tcp = (applet_name[0] == 't');
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 280) 
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 281) 	/* "+": stop on first non-option */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 282) #ifdef SSLSVD
+22542eca18 networking/tcpudp.c (Denys Vlasenko           2017-08-08 21:55:02 +0200 283) 	opts = getopt32(argv, "^+"
+22542eca18 networking/tcpudp.c (Denys Vlasenko           2017-08-08 21:55:02 +0200 284) 		"c:+C:i:x:u:l:Eb:+hpt:vU:/:Z:K:" /* -c NUM, -b NUM */
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 285) 		"\0"
+22542eca18 networking/tcpudp.c (Denys Vlasenko           2017-08-08 21:55:02 +0200 286) 		/* 3+ args, -i at most once, -p implies -h, -v is a counter */
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 287) 		"-3:i--i:ph:vv",
+1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 288) 		&cmax, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
+1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 289) 		&backlog, &str_t, &ssluser, &root, &cert, &key, &verbose
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 290) 	);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 291) #else
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 292) 	opts = getopt32(argv, "^+"
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 293) 		"c:+C:i:x:u:l:Eb:+hpt:v" /* -c NUM, -b NUM */
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 294) 		"\0"
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 295) 		/* 3+ args, -i at most once, -p implies -h, -v is a counter */
+bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 296) 		"-3:i--i:ph:vv",
+1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 297) 		&cmax, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
+1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 298) 		&backlog, &str_t, &verbose
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 299) 	);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 300) #endif
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 301) 	if (opts & OPT_C) { /* -C n[:message] */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 302) 		max_per_host = bb_strtou(str_C, &str_C, 10);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 303) 		if (str_C[0]) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 304) 			if (str_C[0] != ':')
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 305) 				bb_show_usage();
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 306) 			msg_per_host = str_C + 1;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 307) 			len_per_host = strlen(msg_per_host);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 308) 		}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 309) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 310) 	if (max_per_host > cmax)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 311) 		max_per_host = cmax;
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 312) 	if (opts & OPT_u) {
+d73cbd31a2 networking/tcpudp.c (Bernhard Reutner-Fischer 2008-07-21 14:41:33 +0000 313) 		xget_uidgid(&ugid, user);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 314) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 315) #ifdef SSLSVD
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 316) 	if (opts & OPT_U) ssluser = optarg;
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 317) 	if (opts & OPT_slash) root = optarg;
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 318) 	if (opts & OPT_Z) cert = optarg;
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 319) 	if (opts & OPT_K) key = optarg;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 320) #endif
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 321) 	argv += optind;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 322) 	if (!argv[0][0] || LONE_CHAR(argv[0], '0'))
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 323) 		argv[0] = (char*)"0.0.0.0";
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 324) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 325) 	/* Per-IP flood protection is not thought-out for UDP */
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 326) 	if (!tcp)
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 327) 		max_per_host = 0;
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 328) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 329) 	bb_sanitize_stdio(); /* fd# 0,1,2 must be opened */
+992e05b6f0 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-03 01:13:04 +0000 330) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 331) #ifdef SSLSVD
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 332) 	sslser = user;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 333) 	client = 0;
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 334) 	if ((getuid() == 0) && !(opts & OPT_u)) {
+e789c3bea1 networking/tcpudp.c (Jan Luebbe               2018-02-14 14:05:27 +0100 335) 		xfunc_error_retval = 100;
+6937487be7 networking/tcpudp.c (James Byrne              2019-07-02 11:35:03 +0200 336) 		bb_simple_error_msg_and_die(bb_msg_you_must_be_root);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 337) 	}
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 338) 	if (opts & OPT_u)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 339) 		if (!uidgid_get(&sslugid, ssluser, 1)) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 340) 			if (errno) {
+d73cbd31a2 networking/tcpudp.c (Bernhard Reutner-Fischer 2008-07-21 14:41:33 +0000 341) 				bb_perror_msg_and_die("can't get user/group: %s", ssluser);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 342) 			}
+d73cbd31a2 networking/tcpudp.c (Bernhard Reutner-Fischer 2008-07-21 14:41:33 +0000 343) 			bb_error_msg_and_die("unknown user/group %s", ssluser);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 344) 		}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 345) 	if (!cert) cert = "./cert.pem";
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 346) 	if (!key) key = cert;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 347) 	if (matrixSslOpen() < 0)
+6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 348) 		fatal("can't initialize ssl");
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 349) 	if (matrixSslReadKeys(&keys, cert, key, 0, ca) < 0) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 350) 		if (client)
+6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 351) 			fatal("can't read cert, key, or ca file");
+6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 352) 		fatal("can't read cert or key file");
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 353) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 354) 	if (matrixSslNewSession(&ssl, keys, 0, SSL_FLAGS_SERVER) < 0)
+6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 355) 		fatal("can't create ssl session");
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 356) #endif
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 357) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 358) 	sig_block(SIGCHLD);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 359) 	signal(SIGCHLD, sig_child_handler);
+cf7cf62204 networking/tcpudp.c (Denis Vlasenko           2008-03-19 19:38:46 +0000 360) 	bb_signals(BB_FATAL_SIGS, sig_term_handler);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 361) 	signal(SIGPIPE, SIG_IGN);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 362) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 363) 	if (max_per_host)
+d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 364) 		G.cc = ipsvd_perhost_init(cmax);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 365) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 366) 	local_port = bb_lookup_port(argv[1], tcp ? "tcp" : "udp", 0);
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 367) 	lsa = xhost2sockaddr(argv[0], local_port);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 368) 	argv += 2;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 369) 
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 370) 	sock = xsocket(lsa->u.sa.sa_family, tcp ? SOCK_STREAM : SOCK_DGRAM, 0);
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 371) 	setsockopt_reuseaddr(sock);
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 372) 	sa_len = lsa->len; /* I presume sockaddr len stays the same */
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 373) 	xbind(sock, &lsa->u.sa, sa_len);
+16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 374) 	if (tcp) {
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 375) 		xlisten(sock, backlog);
+16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 376) 		close_on_exec_on(sock);
+16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 377) 	} else { /* udp: needed for recv_from_to to work: */
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 378) 		socket_want_pktinfo(sock);
+16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 379) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 380) 	/* ndelay_off(sock); - it is the default I think? */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 381) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 382) #ifndef SSLSVD
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 383) 	if (opts & OPT_u) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 384) 		/* drop permissions */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 385) 		xsetgid(ugid.gid);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 386) 		xsetuid(ugid.uid);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 387) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 388) #endif
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 389) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 390) 	if (verbose) {
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 391) 		char *addr = xmalloc_sockaddr2dotted(&lsa->u.sa);
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 392) 		if (opts & OPT_u)
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 393) 			bb_error_msg("listening on %s, starting, uid %u, gid %u", addr,
+60fadaca28 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 19:10:36 +0000 394) 				(unsigned)ugid.uid, (unsigned)ugid.gid);
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 395) 		else
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 396) 			bb_error_msg("listening on %s, starting", addr);
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 397) 		free(addr);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 398) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 399) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 400) 	/* Main accept() loop */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 401) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 402)  again:
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 403) 	hccp = NULL;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 404) 
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 405)  again1:
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 406) 	close(0);
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 407) 	/* It's important to close(0) _before_ wait loop:
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 408) 	 * fd#0 can be a shared connection fd.
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 409) 	 * If kept open by us, peer can't detect PROG closing it.
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 410) 	 */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 411) 	while (cnum >= cmax)
+3f165fa5b3 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:29:08 +0000 412) 		wait_for_any_sig(); /* expecting SIGCHLD */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 413) 
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 414)  again2:
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 415) 	sig_unblock(SIGCHLD);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 416) 	local.len = remote.len = sa_len;
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 417) 	if (tcp) {
+ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 418) 		/* Accept a connection to fd #0 */
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 419) 		conn = accept(sock, &remote.u.sa, &remote.len);
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 420) 	} else {
+1ca332b367 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 17:49:47 +0000 421) 		/* In case recv_from_to won't be able to recover local addr.
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 422) 		 * Also sets port - recv_from_to is unable to do it. */
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 423) 		local = *lsa;
+aa9b1828b9 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:10:39 +0000 424) 		conn = recv_from_to(sock, NULL, 0, MSG_PEEK,
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 425) 				&remote.u.sa, &local.u.sa, sa_len);
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 426) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 427) 	sig_block(SIGCHLD);
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 428) 	if (conn < 0) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 429) 		if (errno != EINTR)
+6937487be7 networking/tcpudp.c (James Byrne              2019-07-02 11:35:03 +0200 430) 			bb_simple_perror_msg(tcp ? "accept" : "recv");
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 431) 		goto again2;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 432) 	}
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 433) 	xmove_fd(tcp ? conn : sock, 0);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 434) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 435) 	if (max_per_host) {
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 436) 		/* Drop connection immediately if cur_per_host > max_per_host
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 437) 		 * (minimizing load under SYN flood) */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 438) 		remote_addr = xmalloc_sockaddr2dotted_noport(&remote.u.sa);
+d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 439) 		cur_per_host = ipsvd_perhost_add(G.cc, remote_addr, max_per_host, &hccp);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 440) 		if (cur_per_host > max_per_host) {
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 441) 			/* ipsvd_perhost_add detected that max is exceeded
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 442) 			 * (and did not store ip in connection table) */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 443) 			free(remote_addr);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 444) 			if (msg_per_host) {
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 445) 				/* don't block or test for errors */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 446) 				send(0, msg_per_host, len_per_host, MSG_DONTWAIT);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 447) 			}
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 448) 			goto again1;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 449) 		}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 450) 		/* NB: remote_addr is not leaked, it is stored in conn table */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 451) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 452) 
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 453) 	if (!tcp) {
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 454) 		/* Voodoo magic: making udp sockets each receive its own
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 455) 		 * packets is not trivial, and I still not sure
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 456) 		 * I do it 100% right.
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 457) 		 * 1) we have to do it before fork()
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 458) 		 * 2) order is important - is it right now? */
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 459) 
+4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 460) 		/* Open new non-connected UDP socket for further clients... */
+4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 461) 		sock = xsocket(lsa->u.sa.sa_family, SOCK_DGRAM, 0);
+4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 462) 		setsockopt_reuseaddr(sock);
+4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 463) 		/* Make plain write/send work for old socket by supplying default
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 464) 		 * destination address. This also restricts incoming packets
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 465) 		 * to ones coming from this remote IP. */
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 466) 		xconnect(0, &remote.u.sa, sa_len);
+64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 467) 	/* hole? at this point we have no wildcard udp socket...
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 468) 	 * can this cause clients to get "port unreachable" icmp?
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 469) 	 * Yup, time window is very small, but it exists (does it?) */
+4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 470) 		/* ..."open new socket", continued */
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 471) 		xbind(sock, &lsa->u.sa, sa_len);
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 472) 		socket_want_pktinfo(sock);
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 473) 
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 474) 		/* Doesn't work:
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 475) 		 * we cannot replace fd #0 - we will lose pending packet
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 476) 		 * which is already buffered for us! And we cannot use fd #1
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 477) 		 * instead - it will "intercept" all following packets, but child
+f87f495e65 ipsvd/tcpudp.c      (Denis Vlasenko           2007-08-24 10:27:41 +0000 478) 		 * does not expect data coming *from fd #1*! */
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 479) #if 0
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 480) 		/* Make it so that local addr is fixed to localp->u.sa
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 481) 		 * and we don't accidentally accept packets to other local IPs. */
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 482) 		/* NB: we possibly bind to the _very_ same_ address & port as the one
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 483) 		 * already bound in parent! This seems to work in Linux.
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 484) 		 * (otherwise we can move socket to fd #0 only if bind succeeds) */
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 485) 		close(0);
+ca18311d0a networking/tcpudp.c (Denys Vlasenko           2011-04-07 17:52:20 +0200 486) 		set_nport(&localp->u.sa, htons(local_port));
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 487) 		xmove_fd(xsocket(localp->u.sa.sa_family, SOCK_DGRAM, 0), 0);
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 488) 		setsockopt_reuseaddr(0); /* crucial */
+8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 489) 		xbind(0, &localp->u.sa, localp->len);
+794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 490) #endif
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 491) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 492) 
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 493) 	pid = vfork();
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 494) 	if (pid == -1) {
+6937487be7 networking/tcpudp.c (James Byrne              2019-07-02 11:35:03 +0200 495) 		bb_simple_perror_msg("vfork");
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 496) 		goto again;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 497) 	}
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 498) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 499) 	if (pid != 0) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 500) 		/* Parent */
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 501) 		cnum++;
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 502) 		if_verbose_print_connection_status();
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 503) 		if (hccp)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 504) 			hccp->pid = pid;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 505) 		/* clean up changes done by vforked child */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 506) 		undo_xsetenv();
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 507) 		goto again;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 508) 	}
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 509) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 510) 	/* Child: prepare env, log, and exec prog */
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 511) 
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 512) 	{ /* vfork alert! every xmalloc in this block should be freed! */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 513) 		char *local_hostname = local_hostname; /* for compiler */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 514) 		char *local_addr = NULL;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 515) 		char *free_me0 = NULL;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 516) 		char *free_me1 = NULL;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 517) 		char *free_me2 = NULL;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 518) 
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 519) 		if (verbose || !(opts & OPT_E)) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 520) 			if (!max_per_host) /* remote_addr is not yet known */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 521) 				free_me0 = remote_addr = xmalloc_sockaddr2dotted(&remote.u.sa);
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 522) 			if (opts & OPT_h) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 523) 				free_me1 = remote_hostname = xmalloc_sockaddr2host_noport(&remote.u.sa);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 524) 				if (!remote_hostname) {
+6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 525) 					bb_error_msg("can't look up hostname for %s", remote_addr);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 526) 					remote_hostname = remote_addr;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 527) 				}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 528) 			}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 529) 			/* Find out local IP peer connected to.
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 530) 			 * Errors ignored (I'm not paranoid enough to imagine kernel
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 531) 			 * which doesn't know local IP). */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 532) 			if (tcp)
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 533) 				getsockname(0, &local.u.sa, &local.len);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 534) 			/* else: for UDP it is done earlier by parent */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 535) 			local_addr = xmalloc_sockaddr2dotted(&local.u.sa);
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 536) 			if (opts & OPT_h) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 537) 				local_hostname = preset_local_hostname;
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 538) 				if (!local_hostname) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 539) 					free_me2 = local_hostname = xmalloc_sockaddr2host_noport(&local.u.sa);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 540) 					if (!local_hostname)
+6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 541) 						bb_error_msg_and_die("can't look up hostname for %s", local_addr);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 542) 				}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 543) 				/* else: local_hostname is not NULL, but is NOT malloced! */
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 544) 			}
+b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 545) 		}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 546) 		if (verbose) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 547) 			pid = getpid();
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 548) 			if (max_per_host) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 549) 				bb_error_msg("concurrency %s %u/%u",
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 550) 					remote_addr,
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 551) 					cur_per_host, max_per_host);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 552) 			}
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 553) 			bb_error_msg((opts & OPT_h)
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 554) 				? "start %u %s-%s (%s-%s)"
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 555) 				: "start %u %s-%s",
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 556) 				pid,
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 557) 				local_addr, remote_addr,
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 558) 				local_hostname, remote_hostname);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 559) 		}
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 560) 
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 561) 		if (!(opts & OPT_E)) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 562) 			/* setup ucspi env */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 563) 			const char *proto = tcp ? "TCP" : "UDP";
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 564) 
+2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 565) #ifdef SO_ORIGINAL_DST
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 566) 			/* Extract "original" destination addr:port
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 567) 			 * from Linux firewall. Useful when you redirect
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 568) 			 * an outbond connection to local handler, and it needs
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 569) 			 * to know where it originally tried to connect */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 570) 			if (tcp && getsockopt(0, SOL_IP, SO_ORIGINAL_DST, &local.u.sa, &local.len) == 0) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 571) 				char *addr = xmalloc_sockaddr2dotted(&local.u.sa);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 572) 				xsetenv_plain("TCPORIGDSTADDR", addr);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 573) 				free(addr);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 574) 			}
+2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 575) #endif
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 576) 			xsetenv_plain("PROTO", proto);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 577) 			xsetenv_proto(proto, "LOCALADDR", local_addr);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 578) 			xsetenv_proto(proto, "REMOTEADDR", remote_addr);
+d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 579) 			if (opts & OPT_h) {
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 580) 				xsetenv_proto(proto, "LOCALHOST", local_hostname);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 581) 				xsetenv_proto(proto, "REMOTEHOST", remote_hostname);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 582) 			}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 583) 			//compat? xsetenv_proto(proto, "REMOTEINFO", "");
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 584) 			/* additional */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 585) 			if (cur_per_host > 0) /* can not be true for udp */
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 586) 				xsetenv_plain("TCPCONCURRENCY", utoa(cur_per_host));
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 587) 		}
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 588) 		free(local_addr);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 589) 		free(free_me0);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 590) 		free(free_me1);
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 591) 		free(free_me2);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 592) 	}
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 593) 
+aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 594) 	xdup2(0, 1);
+992e05b6f0 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-03 01:13:04 +0000 595) 
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 596) 	/* Restore signal handling for the to-be-execed process */
+3fa36e2350 networking/tcpudp.c (Denis Vlasenko           2008-11-09 00:15:11 +0000 597) 	signal(SIGPIPE, SIG_DFL); /* this one was SIG_IGNed */
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 598) 	/* Non-ignored signals revert to SIG_DFL on exec anyway
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 599) 	 * But we can get signals BEFORE execvp(), this is unlikely
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 600) 	 * but it would invoke sig_child_handler(), which would
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 601) 	 * check waitpid(WNOHANG), then print "status N/M" if verbose.
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 602) 	 * I guess we can live with that possibility.
+d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 603) 	 */
+3fa36e2350 networking/tcpudp.c (Denis Vlasenko           2008-11-09 00:15:11 +0000 604) 	/*signal(SIGCHLD, SIG_DFL);*/
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 605) 	sig_unblock(SIGCHLD);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 606) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 607) #ifdef SSLSVD
+4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 608) 	strcpy(id, utoa(pid));
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 609) 	ssl_io(0, argv);
+21e8e8da64 networking/tcpudp.c (Pascal Bellard           2010-07-04 00:57:03 +0200 610) 	bb_perror_msg_and_die("can't execute '%s'", argv[0]);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 611) #else
+21e8e8da64 networking/tcpudp.c (Pascal Bellard           2010-07-04 00:57:03 +0200 612) 	BB_EXECVP_or_die(argv);
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 613) #endif
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 614) }
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 615) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 616) /*
+57a426b15b ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 10:59:33 +0000 617) tcpsvd [-hpEvv] [-c n] [-C n:msg] [-b n] [-u user] [-l name]
+57a426b15b ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 10:59:33 +0000 618) 	[-i dir|-x cdb] [ -t sec] host port prog
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 619) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 620) tcpsvd creates a TCP/IP socket, binds it to the address host:port,
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 621) and listens on the socket for incoming connections.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 622) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 623) On each incoming connection, tcpsvd conditionally runs a program,
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 624) with standard input reading from the socket, and standard output
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 625) writing to the socket, to handle this connection. tcpsvd keeps
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 626) listening on the socket for new connections, and can handle
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 627) multiple connections simultaneously.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 628) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 629) tcpsvd optionally checks for special instructions depending
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 630) on the IP address or hostname of the client that initiated
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 631) the connection, see ipsvd-instruct(5).
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 632) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 633) host
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 634)     host either is a hostname, or a dotted-decimal IP address,
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 635)     or 0. If host is 0, tcpsvd accepts connections to any local
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 636)     IP address.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 637)     * busybox accepts IPv6 addresses and host:port pairs too
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 638)       In this case second parameter is ignored
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 639) port
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 640)     tcpsvd accepts connections to host:port. port may be a name
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 641)     from /etc/services or a number.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 642) prog
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 643)     prog consists of one or more arguments. For each connection,
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 644)     tcpsvd normally runs prog, with file descriptor 0 reading from
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 645)     the network, and file descriptor 1 writing to the network.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 646)     By default it also sets up TCP-related environment variables,
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 647)     see tcp-environ(5)
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 648) -i dir
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 649)     read instructions for handling new connections from the instructions
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 650)     directory dir. See ipsvd-instruct(5) for details.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 651)     * ignored by busyboxed version
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 652) -x cdb
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 653)     read instructions for handling new connections from the constant database
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 654)     cdb. The constant database normally is created from an instructions
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 655)     directory by running ipsvd-cdb(8).
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 656)     * ignored by busyboxed version
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 657) -t sec
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 658)     timeout. This option only takes effect if the -i option is given.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 659)     While checking the instructions directory, check the time of last access
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 660)     of the file that matches the clients address or hostname if any, discard
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 661)     and remove the file if it wasn't accessed within the last sec seconds;
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 662)     tcpsvd does not discard or remove a file if the user's write permission
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 663)     is not set, for those files the timeout is disabled. Default is 0,
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 664)     which means that the timeout is disabled.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 665)     * ignored by busyboxed version
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 666) -l name
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 667)     local hostname. Do not look up the local hostname in DNS, but use name
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 668)     as hostname. This option must be set if tcpsvd listens on port 53
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 669)     to avoid loops.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 670) -u user[:group]
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 671)     drop permissions. Switch user ID to user's UID, and group ID to user's
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 672)     primary GID after creating and binding to the socket. If user is followed
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 673)     by a colon and a group name, the group ID is switched to the GID of group
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 674)     instead. All supplementary groups are removed.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 675) -c n
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 676)     concurrency. Handle up to n connections simultaneously. Default is 30.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 677)     If there are n connections active, tcpsvd defers acceptance of a new
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 678)     connection until an active connection is closed.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 679) -C n[:msg]
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 680)     per host concurrency. Allow only up to n connections from the same IP
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 681)     address simultaneously. If there are n active connections from one IP
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 682)     address, new incoming connections from this IP address are closed
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 683)     immediately. If n is followed by :msg, the message msg is written
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 684)     to the client if possible, before closing the connection. By default
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 685)     msg is empty. See ipsvd-instruct(5) for supported escape sequences in msg.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 686) 
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 687)     For each accepted connection, the current per host concurrency is
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 688)     available through the environment variable TCPCONCURRENCY. n and msg
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 689)     can be overwritten by ipsvd(7) instructions, see ipsvd-instruct(5).
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 690)     By default tcpsvd doesn't keep track of connections.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 691) -h
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 692)     Look up the client's hostname in DNS.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 693) -p
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 694)     paranoid. After looking up the client's hostname in DNS, look up the IP
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 695)     addresses in DNS for that hostname, and forget about the hostname
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 696)     if none of the addresses match the client's IP address. You should
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 697)     set this option if you use hostname based instructions. The -p option
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 698)     implies the -h option.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 699)     * ignored by busyboxed version
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 700) -b n
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 701)     backlog. Allow a backlog of approximately n TCP SYNs. On some systems n
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 702)     is silently limited. Default is 20.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 703) -E
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 704)     no special environment. Do not set up TCP-related environment variables.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 705) -v
+10ad622dc2 networking/tcpudp.c (Denys Vlasenko           2017-04-17 16:13:32 +0200 706)     verbose. Print verbose messages to standard output.
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 707) -vv
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 708)     more verbose. Print more verbose messages to standard output.
+ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 709)     * no difference between -v and -vv in busyboxed version
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 710) */

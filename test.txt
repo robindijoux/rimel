@@ -1,8 +1,8 @@
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 139) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 164) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 234) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 265) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 339) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 395) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 419) #ifdef HEAD2
-052ad9a568 archival/lzo1x_9x.c            (Denis Vlasenko 2009-04-29 12:01:51 +0000 468) #ifdef SWD_BEST_OFF
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  14)  * Code inside "#ifdef SSLSVD" is for sslsvd and is currently unused.
+2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 110) #ifdef __linux__
+02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 119) #ifdef SSLSVD
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 282) #ifdef SSLSVD
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 315) #ifdef SSLSVD
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 331) #ifdef SSLSVD
+2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 565) #ifdef SO_ORIGINAL_DST
+2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 607) #ifdef SSLSVD

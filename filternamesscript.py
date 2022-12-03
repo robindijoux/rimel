@@ -108,7 +108,8 @@ def extractCommitsInfo():
 #    subprocess.run(["retrieve-info.sh"] , shell=True)
 #    extractAllContributors(contributors)
    for dirAndFile in splitedFilesAndDirs:
-       os.popen(createCommand(dirAndFile[0] , dirAndFile[1])) 
+       os.popen(createCommand(dirAndFile[0] , dirAndFile[1]))
+       time.sleep(2) 
        subprocess.run(["retrieve-info.sh"] , shell=True)
        extractAllContributors(contributors)
    findPaternityOwner(contributors)
