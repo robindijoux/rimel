@@ -1,1115 +1,179 @@
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    1) /* vi: set sw=4 ts=4: */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    2) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    3)  * fsck --- A generic, parallelizing front-end for the fsck program.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    4)  * It will automatically try to run fsck programs in parallel if the
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    5)  * devices are on separate spindles.  It is based on the same ideas as
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    6)  * the generic front end for fsck by David Engel and Fred van Kempen,
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    7)  * but it has been completely rewritten from scratch to support
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    8)  * parallel execution.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    9)  *
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   10)  * Written by Theodore Ts'o, <tytso@mit.edu>
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   11)  *
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   12)  * Miquel van Smoorenburg (miquels@drinkel.ow.org) 20-Oct-1994:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   13)  *   o Changed -t fstype to behave like with mount when -A (all file
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   14)  *     systems) or -M (like mount) is specified.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   15)  *   o fsck looks if it can find the fsck.type program to decide
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   16)  *     if it should ignore the fs type. This way more fsck programs
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   17)  *     can be added without changing this front-end.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   18)  *   o -R flag skip root file system.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   19)  *
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   20)  * Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   21)  *      2001, 2002, 2003, 2004, 2005 by  Theodore Ts'o.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   22)  *
-0ef64bdb40 (Denys Vlasenko 2010-08-16 20:14:46 +0200   23)  * Licensed under GPLv2, see file LICENSE in this source tree.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   24)  */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   25) 
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   26) /* All filesystem specific hooks have been removed.
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   27)  * If filesystem cannot be determined, we will execute
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   28)  * "fsck.auto". Currently this also happens if you specify
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   29)  * UUID=xxx or LABEL=xxx as an object to check.
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   30)  * Detection code for that is also probably has to be in fsck.auto.
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   31)  *
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   32)  * In other words, this is _really_ is just a driver program which
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   33)  * spawns actual fsck.something for each filesystem to check.
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   34)  * It doesn't guess filesystem types from on-disk format.
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   35)  */
-000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   36) //config:config FSCK
-b097a84d62 (Denys Vlasenko 2018-12-28 03:20:17 +0100   37) //config:	bool "fsck (7.4 kb)"
-000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   38) //config:	default y
-000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   39) //config:	help
-72089cf6b4 (Denys Vlasenko 2017-07-21 09:50:55 +0200   40) //config:	fsck is used to check and optionally repair one or more filesystems.
-72089cf6b4 (Denys Vlasenko 2017-07-21 09:50:55 +0200   41) //config:	In actuality, fsck is simply a front-end for the various file system
-72089cf6b4 (Denys Vlasenko 2017-07-21 09:50:55 +0200   42) //config:	checkers (fsck.fstype) available under Linux.
-000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   43) 
-000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   44) //applet:IF_FSCK(APPLET(fsck, BB_DIR_SBIN, BB_SUID_DROP))
-000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   45) 
-000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   46) //kbuild:lib-$(CONFIG_FSCK) += fsck.o
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   47) 
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   48) //usage:#define fsck_trivial_usage
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200   49) //usage:       "[-ANPRTV] [-t FSTYPE] [FS_OPTS] [BLOCKDEV]..."
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   50) //usage:#define fsck_full_usage "\n\n"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   51) //usage:       "Check and repair filesystems\n"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   52) //usage:     "\n	-A	Walk /etc/fstab and check all filesystems"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   53) //usage:     "\n	-N	Don't execute, just show what would be done"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   54) //usage:     "\n	-P	With -A, check filesystems in parallel"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   55) //usage:     "\n	-R	With -A, skip the root filesystem"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   56) //usage:     "\n	-T	Don't show title on startup"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   57) //usage:     "\n	-V	Verbose"
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200   58) //DO_PROGRESS_INDICATOR is off:
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200   59) ////usage:     "\n	-C FD	Write status information to specified file descriptor"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   60) //usage:     "\n	-t TYPE	List of filesystem types to check"
-6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   61) 
-b6adbf1be2 (Denis Vlasenko 2007-05-26 19:00:18 +0000   62) #include "libbb.h"
-e6a2f4cc5a (Denys Vlasenko 2016-04-21 16:26:30 +0200   63) #include "common_bufsiz.h"
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   64) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   65) /* "progress indicator" code is somewhat buggy and ext[23] specific.
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   66)  * We should be filesystem agnostic. IOW: there should be a well-defined
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   67)  * API for fsck.something, NOT ad-hoc hacks in generic fsck. */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   68) #define DO_PROGRESS_INDICATOR 0
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   69) 
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   70) /* fsck 1.41.4 (27-Jan-2009) manpage says:
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   71)  * 0   - No errors
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   72)  * 1   - File system errors corrected
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   73)  * 2   - System should be rebooted
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   74)  * 4   - File system errors left uncorrected
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   75)  * 8   - Operational error
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   76)  * 16  - Usage or syntax error
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   77)  * 32  - Fsck canceled by user request
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   78)  * 128 - Shared library error
-0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   79)  */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   80) #define EXIT_OK          0
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   81) #define EXIT_NONDESTRUCT 1
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   82) #define EXIT_DESTRUCT    2
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   83) #define EXIT_UNCORRECTED 4
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   84) #define EXIT_ERROR       8
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   85) #define EXIT_USAGE       16
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   86) #define FSCK_CANCELED    32     /* Aborted with a signal or ^C */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   87) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   88) /*
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   89)  * Internal structure for mount table entries.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   90)  */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   91) struct fs_info {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000   92) 	struct fs_info *next;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   93) 	char	*device;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   94) 	char	*mountpt;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   95) 	char	*type;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   96) 	char	*opts;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   97) 	int	passno;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   98) 	int	flags;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   99) };
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  100) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  101) #define FLAG_DONE 1
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  102) #define FLAG_PROGRESS 2
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  103) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  104)  * Structure to allow exit codes to be stored
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  105)  */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  106) struct fsck_instance {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  107) 	struct fsck_instance *next;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  108) 	int	pid;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  109) 	int	flags;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  110) #if DO_PROGRESS_INDICATOR
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  111) 	time_t	start_time;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  112) #endif
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  113) 	char	*prog;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  114) 	char	*device;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  115) 	char	*base_device; /* /dev/hda for /dev/hdaN etc */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  116) };
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  117) 
-6ca409e0e4 (Denis Vlasenko 2007-08-12 20:58:27 +0000  118) static const char ignored_types[] ALIGN1 =
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  119) 	"ignore\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  120) 	"iso9660\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  121) 	"nfs\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  122) 	"proc\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  123) 	"sw\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  124) 	"swap\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  125) 	"tmpfs\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  126) 	"devpts\0";
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  127) 
-0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  128) #if 0
-6ca409e0e4 (Denis Vlasenko 2007-08-12 20:58:27 +0000  129) static const char really_wanted[] ALIGN1 =
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  130) 	"minix\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  131) 	"ext2\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  132) 	"ext3\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  133) 	"jfs\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  134) 	"reiserfs\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  135) 	"xiafs\0"
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  136) 	"xfs\0";
-0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  137) #endif
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  138) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  139) #define BASE_MD "/dev/md"
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  140) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  141) struct globals {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  142) 	char **args;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  143) 	int num_args;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  144) 	int verbose;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  145) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  146) #define FS_TYPE_FLAG_NORMAL 0
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  147) #define FS_TYPE_FLAG_OPT    1
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  148) #define FS_TYPE_FLAG_NEGOPT 2
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  149) 	char **fs_type_list;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  150) 	uint8_t *fs_type_flag;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  151) 	smallint fs_type_negated;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  152) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  153) 	smallint noexecute;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  154) 	smallint serialize;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  155) 	smallint skip_root;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  156) 	/* smallint like_mount; */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  157) 	smallint parallel_root;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  158) 	smallint force_all_parallel;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  159) 	smallint kill_sent;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  160) 
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  161) #if DO_PROGRESS_INDICATOR
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  162) 	smallint progress;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  163) 	int progress_fd;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  164) #endif
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  165) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  166) 	int num_running;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  167) 	int max_running;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  168) 	char *fstype;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  169) 	struct fs_info *filesys_info;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  170) 	struct fs_info *filesys_last;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  171) 	struct fsck_instance *instance_list;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  172) } FIX_ALIASING;
-e6a2f4cc5a (Denys Vlasenko 2016-04-21 16:26:30 +0200  173) #define G (*(struct globals*)bb_common_bufsiz1)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  174) #define INIT_G() do { \
-47cfbf32fd (Denys Vlasenko 2016-04-21 18:18:48 +0200  175) 	setup_common_bufsiz(); \
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  176) 	BUILD_BUG_ON(sizeof(G) > COMMON_BUFSIZE); \
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  177) } while (0)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  178) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  179) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  180)  * Return the "base device" given a particular device; this is used to
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  181)  * assure that we only fsck one partition on a particular drive at any
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  182)  * one time.  Otherwise, the disk heads will be seeking all over the
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  183)  * place.  If the base device cannot be determined, return NULL.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  184)  *
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  185)  * The base_device() function returns an allocated string which must
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  186)  * be freed.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  187)  */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  188) #if ENABLE_FEATURE_DEVFS
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  189) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  190)  * Required for the uber-silly devfs /dev/ide/host1/bus2/target3/lun3
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  191)  * pathames.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  192)  */
-987be932ed (Denys Vlasenko 2022-02-06 20:07:12 +0100  193) static const char *const devfs_hier[] ALIGN_PTR = {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  194) 	"host", "bus", "target", "lun", NULL
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  195) };
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  196) #endif
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  197) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  198) static char *base_device(const char *device)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  199) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  200) 	char *str, *cp;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  201) #if ENABLE_FEATURE_DEVFS
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  202) 	const char *const *hier;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  203) 	const char *disk;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  204) 	int len;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  205) #endif
-f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  206) 	str = xstrdup(device);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  207) 
-f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  208) 	/* Skip over "/dev/"; if it's not present, give up */
-f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  209) 	cp = skip_dev_pfx(str);
-f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  210) 	if (cp == str)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  211) 		goto errout;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  212) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  213) 	/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  214) 	 * For md devices, we treat them all as if they were all
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  215) 	 * on one disk, since we don't know how to parallelize them.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  216) 	 */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  217) 	if (cp[0] == 'm' && cp[1] == 'd') {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  218) 		cp[2] = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  219) 		return str;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  220) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  221) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  222) 	/* Handle DAC 960 devices */
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  223) 	if (is_prefixed_with(cp, "rd/")) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  224) 		cp += 3;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  225) 		if (cp[0] != 'c' || !isdigit(cp[1])
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  226) 		 || cp[2] != 'd' || !isdigit(cp[3]))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  227) 			goto errout;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  228) 		cp[4] = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  229) 		return str;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  230) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  231) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  232) 	/* Now let's handle /dev/hd* and /dev/sd* devices.... */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  233) 	if ((cp[0] == 'h' || cp[0] == 's') && cp[1] == 'd') {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  234) 		cp += 2;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  235) 		/* If there's a single number after /dev/hd, skip it */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  236) 		if (isdigit(*cp))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  237) 			cp++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  238) 		/* What follows must be an alpha char, or give up */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  239) 		if (!isalpha(*cp))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  240) 			goto errout;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  241) 		cp[1] = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  242) 		return str;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  243) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  244) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  245) #if ENABLE_FEATURE_DEVFS
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  246) 	/* Now let's handle devfs (ugh) names */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  247) 	len = 0;
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  248) 	if (is_prefixed_with(cp, "ide/"))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  249) 		len = 4;
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  250) 	if (is_prefixed_with(cp, "scsi/"))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  251) 		len = 5;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  252) 	if (len) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  253) 		cp += len;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  254) 		/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  255) 		 * Now we proceed down the expected devfs hierarchy.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  256) 		 * i.e., .../host1/bus2/target3/lun4/...
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  257) 		 * If we don't find the expected token, followed by
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  258) 		 * some number of digits at each level, abort.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  259) 		 */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  260) 		for (hier = devfs_hier; *hier; hier++) {
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  261) 			cp = is_prefixed_with(cp, *hier);
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  262) 			if (!cp)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  263) 				goto errout;
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  264) 			while (*cp != '/' && *cp != '\0') {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  265) 				if (!isdigit(*cp))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  266) 					goto errout;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  267) 				cp++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  268) 			}
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  269) //FIXME: what if *cp = '\0' now? cp++ moves past it!!!
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  270) 			cp++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  271) 		}
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  272) 		cp[-1] = '\0';
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  273) 		return str;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  274) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  275) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  276) 	/* Now handle devfs /dev/disc or /dev/disk names */
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  277) 	disk = NULL;
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  278) 	if (is_prefixed_with(cp, "discs/"))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  279) 		disk = "disc";
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  280) 	else if (is_prefixed_with(cp, "disks/"))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  281) 		disk = "disk";
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  282) 	if (disk) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  283) 		cp += 6;
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  284) 		cp = is_prefixed_with(cp, disk);
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  285) 		if (!cp)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  286) 			goto errout;
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  287) 		while (*cp != '/' && *cp != '\0') {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  288) 			if (!isdigit(*cp))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  289) 				goto errout;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  290) 			cp++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  291) 		}
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  292) 		*cp = '\0';
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  293) 		return str;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  294) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  295) #endif
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  296)  errout:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  297) 	free(str);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  298) 	return NULL;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  299) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  300) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  301) static void free_instance(struct fsck_instance *p)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  302) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  303) 	free(p->prog);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  304) 	free(p->device);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  305) 	free(p->base_device);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  306) 	free(p);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  307) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  308) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  309) static struct fs_info *create_fs_device(const char *device, const char *mntpnt,
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  310) 					const char *type, const char *opts,
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  311) 					int passno)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  312) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  313) 	struct fs_info *fs;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  314) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  315) 	fs = xzalloc(sizeof(*fs));
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  316) 	fs->device = xstrdup(device);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  317) 	fs->mountpt = xstrdup(mntpnt);
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  318) 	if (strchr(type, ','))
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  319) 		type = (char *)"auto";
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  320) 	fs->type = xstrdup(type);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  321) 	fs->opts = xstrdup(opts ? opts : "");
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  322) 	fs->passno = passno < 0 ? 1 : passno;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  323) 	/*fs->flags = 0; */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  324) 	/*fs->next = NULL; */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  325) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  326) 	if (!G.filesys_info)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  327) 		G.filesys_info = fs;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  328) 	else
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  329) 		G.filesys_last->next = fs;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  330) 	G.filesys_last = fs;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  331) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  332) 	return fs;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  333) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  334) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  335) /* Load the filesystem database from /etc/fstab */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  336) static void load_fs_info(const char *filename)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  337) {
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  338) 	FILE *fstab;
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  339) 	struct mntent mte;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  340) 	char buf[1024];
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  341) 
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  342) 	fstab = setmntent(filename, "r");
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  343) 	if (!fstab) {
-651a2697f7 (Denys Vlasenko 2010-03-23 16:25:17 +0100  344) 		bb_perror_msg("can't read '%s'", filename);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  345) 		return;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  346) 	}
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  347) 
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  348) 	// Loop through entries
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  349) 	while (getmntent_r(fstab, &mte, buf, sizeof(buf))) {
-76b680c7a8 (Denys Vlasenko 2016-03-30 16:04:37 +0200  350) 		//bb_error_msg("CREATE[%s][%s][%s][%s][%d]", mte.mnt_fsname, mte.mnt_dir,
-ea7c9b3366 (Denis Vlasenko 2008-09-25 10:39:10 +0000  351) 		//	mte.mnt_type, mte.mnt_opts,
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  352) 		//	mte.mnt_passno);
-60a9414cad (Denys Vlasenko 2011-05-13 20:57:01 +0200  353) 		create_fs_device(mte.mnt_fsname, mte.mnt_dir,
-ea7c9b3366 (Denis Vlasenko 2008-09-25 10:39:10 +0000  354) 			mte.mnt_type, mte.mnt_opts,
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  355) 			mte.mnt_passno);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  356) 	}
-b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  357) 	endmntent(fstab);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  358) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  359) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  360) /* Lookup filesys in /etc/fstab and return the corresponding entry. */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  361) static struct fs_info *lookup(char *filesys)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  362) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  363) 	struct fs_info *fs;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  364) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  365) 	for (fs = G.filesys_info; fs; fs = fs->next) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  366) 		if (strcmp(filesys, fs->device) == 0
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  367) 		 || (fs->mountpt && strcmp(filesys, fs->mountpt) == 0)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  368) 		)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  369) 			break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  370) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  371) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  372) 	return fs;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  373) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  374) 
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  375) #if DO_PROGRESS_INDICATOR
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  376) static int progress_active(void)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  377) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  378) 	struct fsck_instance *inst;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  379) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  380) 	for (inst = G.instance_list; inst; inst = inst->next) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  381) 		if (inst->flags & FLAG_DONE)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  382) 			continue;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  383) 		if (inst->flags & FLAG_PROGRESS)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  384) 			return 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  385) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  386) 	return 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  387) }
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  388) #endif
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  389) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  390) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  391) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  392)  * Send a signal to all outstanding fsck child processes
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  393)  */
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  394) static void kill_all_if_got_signal(void)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  395) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  396) 	struct fsck_instance *inst;
-0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  397) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  398) 	if (!bb_got_signal || G.kill_sent)
-0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  399) 		return;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  400) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  401) 	for (inst = G.instance_list; inst; inst = inst->next) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  402) 		if (inst->flags & FLAG_DONE)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  403) 			continue;
-0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  404) 		kill(inst->pid, SIGTERM);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  405) 	}
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  406) 	G.kill_sent = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  407) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  408) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  409) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  410)  * Wait for one child process to exit; when it does, unlink it from
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  411)  * the list of executing child processes, free, and return its exit status.
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  412)  * If there is no exited child, return -1.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  413)  */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  414) static int wait_one(int flags)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  415) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  416) 	int status;
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  417) 	int exitcode;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  418) 	struct fsck_instance *inst, *prev;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  419) 	pid_t pid;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  420) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  421) 	if (!G.instance_list)
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  422) 		return -1;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  423) 	/* if (G.noexecute) { already returned -1; } */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  424) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  425) 	while (1) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  426) 		pid = waitpid(-1, &status, flags);
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  427) 		kill_all_if_got_signal();
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  428) 		if (pid == 0) /* flags == WNOHANG and no children exited */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  429) 			return -1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  430) 		if (pid < 0) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  431) 			if (errno == EINTR)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  432) 				continue;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  433) 			if (errno == ECHILD) { /* paranoia */
-6937487be7 (James Byrne    2019-07-02 11:35:03 +0200  434) 				bb_simple_error_msg("wait: no more children");
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  435) 				return -1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  436) 			}
-6937487be7 (James Byrne    2019-07-02 11:35:03 +0200  437) 			bb_simple_perror_msg("wait");
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  438) 			continue;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  439) 		}
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  440) 		prev = NULL;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  441) 		inst = G.instance_list;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  442) 		do {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  443) 			if (inst->pid == pid)
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  444) 				goto child_died;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  445) 			prev = inst;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  446) 			inst = inst->next;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  447) 		} while (inst);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  448) 	}
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  449)  child_died:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  450) 
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  451) 	exitcode = WEXITSTATUS(status);
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  452) 	if (WIFSIGNALED(status)) {
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  453) 		unsigned sig;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  454) 		sig = WTERMSIG(status);
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  455) 		exitcode = EXIT_UNCORRECTED;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  456) 		if (sig != SIGINT) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  457) 			printf("Warning: %s %s terminated "
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  458) 				"by signal %u\n",
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  459) 				inst->prog, inst->device, sig);
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  460) 			exitcode = EXIT_ERROR;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  461) 		}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  462) 	}
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  463) 
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  464) #if DO_PROGRESS_INDICATOR
-a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000  465) 	if (progress && (inst->flags & FLAG_PROGRESS) && !progress_active()) {
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  466) 		struct fsck_instance *inst2;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  467) 		for (inst2 = G.instance_list; inst2; inst2 = inst2->next) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  468) 			if (inst2->flags & FLAG_DONE)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  469) 				continue;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  470) 			if (strcmp(inst2->type, "ext2") != 0
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  471) 			 && strcmp(inst2->type, "ext3") != 0
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  472) 			) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  473) 				continue;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  474) 			}
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  475) 			/* ext[23], we will send USR1
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  476) 			 * (request to start displaying progress bar)
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  477) 			 *
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  478) 			 * If we've just started the fsck, wait a tiny
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  479) 			 * bit before sending the kill, to give it
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  480) 			 * time to set up the signal handler
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  481) 			 */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  482) 			if (inst2->start_time >= time(NULL) - 1)
-ec16c030bd (Denys Vlasenko 2020-11-29 11:37:34 +0100  483) 				sleep1();
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  484) 			kill(inst2->pid, SIGUSR1);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  485) 			inst2->flags |= FLAG_PROGRESS;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  486) 			break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  487) 		}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  488) 	}
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  489) #endif
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  490) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  491) 	if (prev)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  492) 		prev->next = inst->next;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  493) 	else
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  494) 		G.instance_list = inst->next;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  495) 	if (G.verbose > 1)
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  496) 		printf("Finished with %s (exit status %u)\n",
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  497) 			inst->device, exitcode);
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  498) 	G.num_running--;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  499) 	free_instance(inst);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  500) 
-ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  501) 	return exitcode;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  502) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  503) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  504) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  505)  * Wait until all executing child processes have exited; return the
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  506)  * logical OR of all of their exit code values.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  507)  */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  508) #define FLAG_WAIT_ALL           0
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  509) #define FLAG_WAIT_ATLEAST_ONE   WNOHANG
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  510) static int wait_many(int flags)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  511) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  512) 	int exit_status;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  513) 	int global_status = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  514) 	int wait_flags = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  515) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  516) 	while ((exit_status = wait_one(wait_flags)) != -1) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  517) 		global_status |= exit_status;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  518) 		wait_flags |= flags;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  519) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  520) 	return global_status;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  521) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  522) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  523) /*
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  524)  * Execute a particular fsck program, and link it into the list of
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  525)  * child processes we are waiting for.
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  526)  */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  527) static void execute(const char *type, const char *device,
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  528) 		const char *mntpt /*, int interactive */)
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  529) {
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  530) 	int i;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  531) 	struct fsck_instance *inst;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  532) 	pid_t pid;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  533) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  534) 	G.args[0] = xasprintf("fsck.%s", type);
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  535) 
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  536) #if DO_PROGRESS_INDICATOR
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  537) 	if (progress && !progress_active()) {
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  538) 		if (strcmp(type, "ext2") == 0
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  539) 		 || strcmp(type, "ext3") == 0
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  540) 		) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  541) 			G.args[XXX] = xasprintf("-C%d", progress_fd); /* 1 */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  542) 			inst->flags |= FLAG_PROGRESS;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  543) 		}
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  544) 	}
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  545) #endif
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  546) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  547) 	G.args[G.num_args - 2] = (char*)device;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  548) 	/* G.args[G.num_args - 1] = NULL; - already is */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  549) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  550) 	if (G.verbose || G.noexecute) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  551) 		printf("[%s (%d) -- %s]", G.args[0], G.num_running,
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  552) 					mntpt ? mntpt : device);
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  553) 		for (i = 0; G.args[i]; i++)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  554) 			printf(" %s", G.args[i]);
-4daad9004d (Denis Vlasenko 2007-09-27 10:20:47 +0000  555) 		bb_putchar('\n');
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  556) 	}
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  557) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  558) 	/* Fork and execute the correct program. */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  559) 	pid = -1;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  560) 	if (!G.noexecute) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  561) 		pid = spawn(G.args);
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  562) 		if (pid < 0)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  563) 			bb_simple_perror_msg(G.args[0]);
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  564) 	}
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  565) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  566) #if DO_PROGRESS_INDICATOR
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  567) 	free(G.args[XXX]);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  568) #endif
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  569) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  570) 	/* No child, so don't record an instance */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  571) 	if (pid <= 0) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  572) 		free(G.args[0]);
-30eb319103 (Denis Vlasenko 2008-02-02 18:54:58 +0000  573) 		return;
-30eb319103 (Denis Vlasenko 2008-02-02 18:54:58 +0000  574) 	}
-30eb319103 (Denis Vlasenko 2008-02-02 18:54:58 +0000  575) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  576) 	inst = xzalloc(sizeof(*inst));
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  577) 	inst->pid = pid;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  578) 	inst->prog = G.args[0];
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  579) 	inst->device = xstrdup(device);
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  580) 	inst->base_device = base_device(device);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  581) #if DO_PROGRESS_INDICATOR
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  582) 	inst->start_time = time(NULL);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  583) #endif
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  584) 
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  585) 	/* Add to the list of running fsck's.
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  586) 	 * (was adding to the end, but adding to the front is simpler...) */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  587) 	inst->next = G.instance_list;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  588) 	G.instance_list = inst;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  589) }
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  590) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  591) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  592)  * Run the fsck program on a particular device
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  593)  *
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  594)  * If the type is specified using -t, and it isn't prefixed with "no"
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  595)  * (as in "noext2") and only one filesystem type is specified, then
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  596)  * use that type regardless of what is specified in /etc/fstab.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  597)  *
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  598)  * If the type isn't specified by the user, then use either the type
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  599)  * specified in /etc/fstab, or "auto".
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  600)  */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  601) static void fsck_device(struct fs_info *fs /*, int interactive */)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  602) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  603) 	const char *type;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  604) 
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  605) 	if (strcmp(fs->type, "auto") != 0) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  606) 		type = fs->type;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  607) 		if (G.verbose > 2)
-c418f48d8d (Denys Vlasenko 2016-03-30 16:30:24 +0200  608) 			printf("using filesystem type '%s' %s\n",
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  609) 					type, "from fstab");
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  610) 	} else if (G.fstype
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  611) 	 && (G.fstype[0] != 'n' || G.fstype[1] != 'o') /* != "no" */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  612) 	 && !is_prefixed_with(G.fstype, "opts=")
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  613) 	 && !is_prefixed_with(G.fstype, "loop")
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  614) 	 && !strchr(G.fstype, ',')
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  615) 	) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  616) 		type = G.fstype;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  617) 		if (G.verbose > 2)
-c418f48d8d (Denys Vlasenko 2016-03-30 16:30:24 +0200  618) 			printf("using filesystem type '%s' %s\n",
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  619) 					type, "from -t");
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  620) 	} else {
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  621) 		type = "auto";
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  622) 		if (G.verbose > 2)
-c418f48d8d (Denys Vlasenko 2016-03-30 16:30:24 +0200  623) 			printf("using filesystem type '%s' %s\n",
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  624) 					type, "(default)");
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  625) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  626) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  627) 	G.num_running++;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  628) 	execute(type, fs->device, fs->mountpt /*, interactive */);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  629) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  630) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  631) /*
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  632)  * Returns TRUE if a partition on the same disk is already being
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  633)  * checked.
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  634)  */
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  635) static int device_already_active(char *device)
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  636) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  637) 	struct fsck_instance *inst;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  638) 	char *base;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  639) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  640) 	if (G.force_all_parallel)
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  641) 		return 0;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  642) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  643) #ifdef BASE_MD
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  644) 	/* Don't check a soft raid disk with any other disk */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  645) 	if (G.instance_list
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  646) 	 && (is_prefixed_with(G.instance_list->device, BASE_MD)
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  647) 	     || is_prefixed_with(device, BASE_MD))
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  648) 	) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  649) 		return 1;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  650) 	}
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  651) #endif
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  652) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  653) 	base = base_device(device);
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  654) 	/*
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  655) 	 * If we don't know the base device, assume that the device is
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  656) 	 * already active if there are any fsck instances running.
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  657) 	 */
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  658) 	if (!base)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  659) 		return (G.instance_list != NULL);
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  660) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  661) 	for (inst = G.instance_list; inst; inst = inst->next) {
-1d3a04a3a4 (Denys Vlasenko 2016-11-28 01:22:57 +0100  662) 		if (!inst->base_device || strcmp(base, inst->base_device) == 0) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  663) 			free(base);
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  664) 			return 1;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  665) 		}
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  666) 	}
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  667) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  668) 	free(base);
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  669) 	return 0;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  670) }
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  671) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  672) /*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  673)  * This function returns true if a particular option appears in a
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  674)  * comma-delimited options list
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  675)  */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  676) static int opt_in_list(char *opt, char *optlist)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  677) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  678) 	char *s;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  679) 	int len;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  680) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  681) 	if (!optlist)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  682) 		return 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  683) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  684) 	len = strlen(opt);
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  685) 	s = optlist - 1;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  686) 	while (1) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  687) 		s = strstr(s + 1, opt);
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  688) 		if (!s)
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  689) 			return 0;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  690) 		/* neither "opt.." nor "xxx,opt.."? */
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  691) 		if (s != optlist && s[-1] != ',')
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  692) 			continue;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  693) 		/* neither "..opt" nor "..opt,xxx"? */
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  694) 		if (s[len] != '\0' && s[len] != ',')
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  695) 			continue;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  696) 		return 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  697) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  698) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  699) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  700) /* See if the filesystem matches the criteria given by the -t option */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  701) static int fs_match(struct fs_info *fs)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  702) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  703) 	int n, ret, checked_type;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  704) 	char *cp;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  705) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  706) 	if (!G.fs_type_list)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  707) 		return 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  708) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  709) 	ret = 0;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  710) 	checked_type = 0;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  711) 	n = 0;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  712) 	while (1) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  713) 		cp = G.fs_type_list[n];
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  714) 		if (!cp)
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  715) 			break;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  716) 		switch (G.fs_type_flag[n]) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  717) 		case FS_TYPE_FLAG_NORMAL:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  718) 			checked_type++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  719) 			if (strcmp(cp, fs->type) == 0)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  720) 				ret = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  721) 			break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  722) 		case FS_TYPE_FLAG_NEGOPT:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  723) 			if (opt_in_list(cp, fs->opts))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  724) 				return 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  725) 			break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  726) 		case FS_TYPE_FLAG_OPT:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  727) 			if (!opt_in_list(cp, fs->opts))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  728) 				return 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  729) 			break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  730) 		}
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  731) 		n++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  732) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  733) 	if (checked_type == 0)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  734) 		return 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  735) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  736) 	return (G.fs_type_negated ? !ret : ret);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  737) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  738) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  739) /* Check if we should ignore this filesystem. */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  740) static int ignore(struct fs_info *fs)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  741) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  742) 	/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  743) 	 * If the pass number is 0, ignore it.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  744) 	 */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  745) 	if (fs->passno == 0)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  746) 		return 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  747) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  748) 	/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  749) 	 * If a specific fstype is specified, and it doesn't match,
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  750) 	 * ignore it.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  751) 	 */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  752) 	if (!fs_match(fs))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  753) 		return 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  754) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  755) 	/* Are we ignoring this type? */
-990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  756) 	if (index_in_strings(ignored_types, fs->type) >= 0)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  757) 		return 1;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  758) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  759) 	/* We can and want to check this file system type. */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  760) 	return 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  761) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  762) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  763) /* Check all file systems, using the /etc/fstab table. */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  764) static int check_all(void)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  765) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  766) 	struct fs_info *fs;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  767) 	int status = EXIT_OK;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  768) 	smallint not_done_yet;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  769) 	smallint pass_done;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  770) 	int passno;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  771) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  772) 	if (G.verbose)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  773) 		puts("Checking all filesystems");
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  774) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  775) 	/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  776) 	 * Do an initial scan over the filesystem; mark filesystems
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  777) 	 * which should be ignored as done, and resolve any "auto"
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  778) 	 * filesystem types (done as a side-effect of calling ignore()).
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  779) 	 */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  780) 	for (fs = G.filesys_info; fs; fs = fs->next)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  781) 		if (ignore(fs))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  782) 			fs->flags |= FLAG_DONE;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  783) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  784) 	/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  785) 	 * Find and check the root filesystem.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  786) 	 */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  787) 	if (!G.parallel_root) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  788) 		for (fs = G.filesys_info; fs; fs = fs->next) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  789) 			if (LONE_CHAR(fs->mountpt, '/')) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  790) 				if (!G.skip_root && !ignore(fs)) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  791) 					fsck_device(fs /*, 1*/);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  792) 					status |= wait_many(FLAG_WAIT_ALL);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  793) 					if (status > EXIT_NONDESTRUCT)
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  794) 						return status;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  795) 				}
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  796) 				fs->flags |= FLAG_DONE;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  797) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  798) 			}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  799) 		}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  800) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  801) 	/*
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  802) 	 * This is for the bone-headed user who has root
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  803) 	 * filesystem listed twice.
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  804) 	 * "Skip root" will skip _all_ root entries.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  805) 	 */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  806) 	if (G.skip_root)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  807) 		for (fs = G.filesys_info; fs; fs = fs->next)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  808) 			if (LONE_CHAR(fs->mountpt, '/'))
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  809) 				fs->flags |= FLAG_DONE;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  810) 
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  811) 	not_done_yet = 1;
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  812) 	passno = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  813) 	while (not_done_yet) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  814) 		not_done_yet = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  815) 		pass_done = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  816) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  817) 		for (fs = G.filesys_info; fs; fs = fs->next) {
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  818) 			if (bb_got_signal)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  819) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  820) 			if (fs->flags & FLAG_DONE)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  821) 				continue;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  822) 			/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  823) 			 * If the filesystem's pass number is higher
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  824) 			 * than the current pass number, then we didn't
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  825) 			 * do it yet.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  826) 			 */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  827) 			if (fs->passno > passno) {
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  828) 				not_done_yet = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  829) 				continue;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  830) 			}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  831) 			/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  832) 			 * If a filesystem on a particular device has
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  833) 			 * already been spawned, then we need to defer
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  834) 			 * this to another pass.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  835) 			 */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  836) 			if (device_already_active(fs->device)) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  837) 				pass_done = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  838) 				continue;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  839) 			}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  840) 			/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  841) 			 * Spawn off the fsck process
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  842) 			 */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  843) 			fsck_device(fs /*, G.serialize*/);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  844) 			fs->flags |= FLAG_DONE;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  845) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  846) 			/*
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  847) 			 * Only do one filesystem at a time, or if we
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  848) 			 * have a limit on the number of fsck's extant
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  849) 			 * at one time, apply that limit.
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  850) 			 */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  851) 			if (G.serialize
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  852) 			 || (G.num_running >= G.max_running)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  853) 			) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  854) 				pass_done = 0;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  855) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  856) 			}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  857) 		}
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  858) 		if (bb_got_signal)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  859) 			break;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  860) 		if (G.verbose > 1)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  861) 			printf("--waiting-- (pass %d)\n", passno);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  862) 		status |= wait_many(pass_done ? FLAG_WAIT_ALL :
-6967578728 (Denys Vlasenko 2013-01-14 01:34:48 +0100  863) 				FLAG_WAIT_ATLEAST_ONE);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  864) 		if (pass_done) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  865) 			if (G.verbose > 1)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  866) 				puts("----------------------------------");
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  867) 			passno++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  868) 		} else
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  869) 			not_done_yet = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  870) 	}
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  871) 	kill_all_if_got_signal();
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  872) 	status |= wait_many(FLAG_WAIT_ATLEAST_ONE);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  873) 	return status;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  874) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  875) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  876) /*
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  877)  * Deal with the fsck -t argument.
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  878)  * Huh, for mount "-t novfat,nfs" means "neither vfat nor nfs"!
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  879)  * Why here we require "-t novfat,nonfs" ??
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  880)  */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  881) static void compile_fs_type(char *fs_type)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  882) {
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  883) 	char *s;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  884) 	int num = 2;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  885) 	smallint negate;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  886) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  887) 	s = fs_type;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  888) 	while ((s = strchr(s, ','))) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  889) 		num++;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  890) 		s++;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  891) 	}
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  892) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  893) 	G.fs_type_list = xzalloc(num * sizeof(G.fs_type_list[0]));
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  894) 	G.fs_type_flag = xzalloc(num * sizeof(G.fs_type_flag[0]));
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  895) 	G.fs_type_negated = -1; /* not yet known is it negated or not */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  896) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  897) 	num = 0;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  898) 	s = fs_type;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  899) 	while (1) {
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  900) 		char *comma;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  901) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  902) 		negate = 0;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  903) 		if (s[0] == 'n' && s[1] == 'o') { /* "no.." */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  904) 			s += 2;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  905) 			negate = 1;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  906) 		} else if (s[0] == '!') {
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  907) 			s++;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  908) 			negate = 1;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  909) 		}
-e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  910) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  911) 		if (strcmp(s, "loop") == 0)
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  912) 			/* loop is really short-hand for opts=loop */
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  913) 			goto loop_special_case;
-8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  914) 		if (is_prefixed_with(s, "opts=")) {
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  915) 			s += 5;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  916)  loop_special_case:
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  917) 			G.fs_type_flag[num] = negate ? FS_TYPE_FLAG_NEGOPT : FS_TYPE_FLAG_OPT;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  918) 		} else {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  919) 			if (G.fs_type_negated == -1)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  920) 				G.fs_type_negated = negate;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  921) 			if (G.fs_type_negated != negate)
-6937487be7 (James Byrne    2019-07-02 11:35:03 +0200  922) 				bb_simple_error_msg_and_die(
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  923) "either all or none of the filesystem types passed to -t must be prefixed "
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  924) "with 'no' or '!'");
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  925) 		}
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  926) 		comma = strchrnul(s, ',');
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  927) 		G.fs_type_list[num++] = xstrndup(s, comma-s);
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  928) 		if (*comma == '\0')
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  929) 			break;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  930) 		s = comma + 1;
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  931) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  932) }
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  933) 
-7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  934) static char **new_args(void)
-7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  935) {
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  936) 	G.args = xrealloc_vector(G.args, 2, G.num_args);
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  937) 	return &G.args[G.num_args++];
-7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  938) }
-7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  939) 
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  940) int fsck_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  941) int fsck_main(int argc UNUSED_PARAM, char **argv)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  942) {
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  943) 	int i, status;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  944) 	/*int interactive;*/
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  945) 	struct fs_info *fs;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  946) 	const char *fstab;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  947) 	char *tmp;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  948) 	char **devices;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  949) 	int num_devices;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  950) 	smallint opts_for_fsck;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  951) 	smallint doall;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  952) 	smallint notitle;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  953) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  954) 	INIT_G();
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  955) 
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  956) 	/* we want wait() to be interruptible */
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  957) 	signal_no_SA_RESTART_empty_mask(SIGINT, record_signo);
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  958) 	signal_no_SA_RESTART_empty_mask(SIGTERM, record_signo);
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  959) 
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  960) 	setbuf(stdout, NULL);
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  961) 
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  962) 	opts_for_fsck = doall = notitle = 0;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  963) 	devices = NULL;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  964) 	num_devices = 0;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  965) 	new_args(); /* G.args[0] = NULL, will be replaced by fsck.<type> */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  966) 	/* G.instance_list = NULL; - in bss, so already zeroed */
-7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  967) 
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  968) 	while (*++argv) {
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  969) 		int j;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  970) 		int optpos;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  971) 		char *options;
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  972) 		char *arg = *argv;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  973) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  974) 		/* "/dev/blk" or "/path" or "UUID=xxx" or "LABEL=xxx" */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  975) 		if ((arg[0] == '/' && !opts_for_fsck) || strchr(arg, '=')) {
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  976) // FIXME: must check that arg is a blkdev, or resolve
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  977) // "/path", "UUID=xxx" or "LABEL=xxx" into block device name
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  978) // ("UUID=xxx"/"LABEL=xxx" can probably shifted to fsck.auto duties)
-deeed59de0 (Denis Vlasenko 2008-07-08 05:14:36 +0000  979) 			devices = xrealloc_vector(devices, 2, num_devices);
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  980) 			devices[num_devices++] = arg;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  981) 			continue;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  982) 		}
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  983) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  984) 		if (arg[0] != '-' || opts_for_fsck) {
-7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  985) 			*new_args() = arg;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  986) 			continue;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  987) 		}
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  988) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  989) 		if (LONE_CHAR(arg + 1, '-')) { /* "--" ? */
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  990) 			opts_for_fsck = 1;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  991) 			continue;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  992) 		}
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  993) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  994) 		optpos = 0;
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  995) 		options = NULL;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  996) 		for (j = 1; arg[j]; j++) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  997) 			switch (arg[j]) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  998) 			case 'A':
-a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000  999) 				doall = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1000) 				break;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1001) #if DO_PROGRESS_INDICATOR
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1002) 			case 'C':
-a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1003) 				progress = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1004) 				if (arg[++j]) { /* -Cn */
-7783248eaa (Denys Vlasenko 2010-08-12 14:14:45 +0200 1005) 					progress_fd = xatoi_positive(&arg[j]);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1006) 					goto next_arg;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1007) 				}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1008) 				/* -C n */
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1009) 				if (!*++argv)
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1010) 					bb_show_usage();
-7783248eaa (Denys Vlasenko 2010-08-12 14:14:45 +0200 1011) 				progress_fd = xatoi_positive(*argv);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1012) 				goto next_arg;
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1013) #endif
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1014) 			case 'V':
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1015) 				G.verbose++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1016) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1017) 			case 'N':
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1018) 				G.noexecute = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1019) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1020) 			case 'R':
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1021) 				G.skip_root = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1022) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1023) 			case 'T':
-a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1024) 				notitle = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1025) 				break;
-a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1026) /*			case 'M':
-a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1027) 				like_mount = 1;
-a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1028) 				break; */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1029) 			case 'P':
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1030) 				G.parallel_root = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1031) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1032) 			case 's':
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1033) 				G.serialize = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1034) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1035) 			case 't':
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1036) 				if (G.fstype)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1037) 					bb_show_usage();
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1038) 				if (arg[++j])
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1039) 					tmp = &arg[j];
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1040) 				else if (*++argv)
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1041) 					tmp = *argv;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1042) 				else
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1043) 					bb_show_usage();
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1044) 				G.fstype = xstrdup(tmp);
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1045) 				compile_fs_type(G.fstype);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1046) 				goto next_arg;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1047) 			case '?':
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1048) 				bb_show_usage();
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1049) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1050) 			default:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1051) 				optpos++;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1052) 				/* one extra for '\0' */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1053) 				options = xrealloc(options, optpos + 2);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1054) 				options[optpos] = arg[j];
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1055) 				break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1056) 			}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1057) 		}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1058)  next_arg:
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1059) 		if (optpos) {
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1060) 			options[0] = '-';
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1061) 			options[optpos + 1] = '\0';
-7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200 1062) 			*new_args() = options;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1063) 		}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1064) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1065) 	if (getenv("FSCK_FORCE_ALL_PARALLEL"))
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1066) 		G.force_all_parallel = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1067) 	tmp = getenv("FSCK_MAX_INST");
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1068) 	G.max_running = INT_MAX;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1069) 	if (tmp)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1070) 		G.max_running = xatoi(tmp);
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1071) 	new_args(); /* G.args[G.num_args - 2] will be replaced by <device> */
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1072) 	new_args(); /* G.args[G.num_args - 1] is the last, NULL element */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1073) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1074) 	if (!notitle)
-eba7fe6bb9 (Denys Vlasenko 2017-01-29 19:14:26 +0100 1075) 		puts("fsck (busybox "BB_VER")");
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1076) 
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000 1077) 	/* Even plain "fsck /dev/hda1" needs fstab to get fs type,
-1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000 1078) 	 * so we are scanning it anyway */
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1079) 	fstab = getenv("FSTAB_FILE");
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1080) 	if (!fstab)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1081) 		fstab = "/etc/fstab";
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1082) 	load_fs_info(fstab);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1083) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1084) 	/*interactive = (num_devices == 1) | G.serialize;*/
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1085) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1086) 	if (num_devices == 0)
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1087) 		/*interactive =*/ G.serialize = doall = 1;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1088) 	if (doall)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1089) 		return check_all();
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1090) 
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1091) 	status = 0;
-0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000 1092) 	for (i = 0; i < num_devices; i++) {
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1093) 		if (bb_got_signal) {
-6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1094) 			kill_all_if_got_signal();
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1095) 			break;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1096) 		}
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1097) 
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1098) 		fs = lookup(devices[i]);
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1099) 		if (!fs)
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1100) 			fs = create_fs_device(devices[i], "", "auto", NULL, -1);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1101) 		fsck_device(fs /*, interactive */);
-f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1102) 
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1103) 		if (G.serialize
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1104) 		 || (G.num_running >= G.max_running)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1105) 		) {
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1106) 			int exit_status = wait_one(0);
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1107) 			if (exit_status >= 0)
-a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1108) 				status |= exit_status;
-c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1109) 			if (G.verbose > 1)
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1110) 				puts("----------------------------------");
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1111) 		}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1112) 	}
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1113) 	status |= wait_many(FLAG_WAIT_ALL);
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1114) 	return status;
-c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1115) }
+63fc1a9e08 ("Robert P. J. Day"       2006-07-02 19:47:05 +0000   1) /* vi: set sw=4 ts=4: */
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000   2) /*
+0ef64bdb40 (Denys Vlasenko           2010-08-16 20:14:46 +0200   3)  * Licensed under GPLv2 or later, see file LICENSE in this source tree.
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000   4)  */
+421d9e5941 (Bernhard Reutner-Fischer 2006-04-03 16:39:31 +0000   5) #include "libbb.h"
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000   6) 
+0a4d0e8fbf (Bartosz Golaszewski      2015-08-25 13:10:00 +0200   7) /*
+0a4d0e8fbf (Bartosz Golaszewski      2015-08-25 13:10:00 +0200   8)  * Return NULL if string is not prefixed with key. Return pointer to the
+0a4d0e8fbf (Bartosz Golaszewski      2015-08-25 13:10:00 +0200   9)  * first character in string after the prefix key. If key is an empty string,
+0a4d0e8fbf (Bartosz Golaszewski      2015-08-25 13:10:00 +0200  10)  * return pointer to the beginning of string.
+0a4d0e8fbf (Bartosz Golaszewski      2015-08-25 13:10:00 +0200  11)  */
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  12) char* FAST_FUNC is_prefixed_with(const char *string, const char *key)
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  13) {
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  14) #if 0	/* Two passes over key - probably slower */
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  15) 	int len = strlen(key);
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  16) 	if (strncmp(string, key, len) == 0)
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  17) 		return string + len;
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  18) 	return NULL;
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  19) #else	/* Open-coded */
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  20) 	while (*key != '\0') {
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  21) 		if (*key != *string)
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  22) 			return NULL;
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  23) 		key++;
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  24) 		string++;
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  25) 	}
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  26) 	return (char*)string;
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  27) #endif
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  28) }
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  29) 
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  30) /*
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  31)  * Return NULL if string is not suffixed with key. Return pointer to the
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  32)  * beginning of prefix key in string. If key is an empty string return pointer
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  33)  * to the end of string.
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  34)  */
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  35) char* FAST_FUNC is_suffixed_with(const char *string, const char *key)
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  36) {
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  37) 	size_t key_len = strlen(key);
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  38) 	ssize_t len_diff = strlen(string) - key_len;
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  39) 
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  40) 	if (len_diff >= 0) {
+68acc0f835 (Denys Vlasenko           2015-08-25 21:47:33 +0200  41) 		string += len_diff;
+68acc0f835 (Denys Vlasenko           2015-08-25 21:47:33 +0200  42) 		if (strcmp(string, key) == 0) {
+68acc0f835 (Denys Vlasenko           2015-08-25 21:47:33 +0200  43) 			return (char*)string;
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  44) 		}
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  45) 	}
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  46) 
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  47) 	return NULL;
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  48) }
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200  49) 
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  50) /* returns the array index of the string */
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  51) /* (index of first match is returned, or -1) */
+defc1ea340 (Denis Vlasenko           2008-06-27 02:52:20 +0000  52) int FAST_FUNC index_in_str_array(const char *const string_array[], const char *key)
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000  53) {
+cc34344d91 ("Vladimir N. Oleynik"    2005-11-26 10:45:26 +0000  54) 	int i;
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000  55) 
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000  56) 	for (i = 0; string_array[i] != 0; i++) {
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000  57) 		if (strcmp(string_array[i], key) == 0) {
+cc34344d91 ("Vladimir N. Oleynik"    2005-11-26 10:45:26 +0000  58) 			return i;
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000  59) 		}
+b963875a3e (Glenn L McGrath          2002-12-02 00:01:36 +0000  60) 	}
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  61) 	return -1;
+cad5364599 (Manuel Novoa III         2003-03-19 09:13:01 +0000  62) }
+cad5364599 (Manuel Novoa III         2003-03-19 09:13:01 +0000  63) 
+defc1ea340 (Denis Vlasenko           2008-06-27 02:52:20 +0000  64) int FAST_FUNC index_in_strings(const char *strings, const char *key)
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  65) {
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  66) 	int j, idx = 0;
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  67) 
+d12fcc20da (Denis Vlasenko           2008-05-31 07:34:14 +0000  68) 	while (*strings) {
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  69) 		/* Do we see "key\0" at current position in strings? */
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  70) 		for (j = 0; *strings == key[j]; ++j) {
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  71) 			if (*strings++ == '\0') {
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  72) 				//bb_error_msg("found:'%s' i:%u", key, idx);
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  73) 				return idx; /* yes */
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  74) 			}
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  75) 		}
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  76) 		/* No.  Move to the start of the next string. */
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  77) 		while (*strings++ != '\0')
+bcf91d2760 (Ron Yorston              2021-01-29 13:23:27 +0000  78) 			continue;
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  79) 		idx++;
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  80) 	}
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  81) 	return -1;
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  82) }
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  83) 
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  84) /* returns the array index of the string, even if it matches only a beginning */
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  85) /* (index of first match is returned, or -1) */
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  86) #ifdef UNUSED
+defc1ea340 (Denis Vlasenko           2008-06-27 02:52:20 +0000  87) int FAST_FUNC index_in_substr_array(const char *const string_array[], const char *key)
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  88) {
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  89) 	int i;
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  90) 	if (key[0]) {
+eceecea568 (Bernhard Reutner-Fischer 2007-03-30 14:43:27 +0000  91) 		for (i = 0; string_array[i] != 0; i++) {
+8dff01d06a (Denys Vlasenko           2015-03-12 17:48:34 +0100  92) 			if (is_prefixed_with(string_array[i], key)) {
+eceecea568 (Bernhard Reutner-Fischer 2007-03-30 14:43:27 +0000  93) 				return i;
+eceecea568 (Bernhard Reutner-Fischer 2007-03-30 14:43:27 +0000  94) 			}
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  95) 		}
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  96) 	}
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  97) 	return -1;
+5af906e7c8 (Denis Vlasenko           2006-11-05 18:05:09 +0000  98) }
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000  99) #endif
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 100) 
+defc1ea340 (Denis Vlasenko           2008-06-27 02:52:20 +0000 101) int FAST_FUNC index_in_substrings(const char *strings, const char *key)
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 102) {
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 103) 	int matched_idx = -1;
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 104) 	const int len = strlen(key);
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 105) 
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 106) 	if (len) {
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 107) 		int idx = 0;
+d12fcc20da (Denis Vlasenko           2008-05-31 07:34:14 +0000 108) 		while (*strings) {
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 109) 			if (strncmp(strings, key, len) == 0) {
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 110) 				if (strings[len] == '\0')
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 111) 					return idx; /* exact match */
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 112) 				if (matched_idx >= 0)
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 113) 					return -1; /* ambiguous match */
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 114) 				matched_idx = idx;
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 115) 			}
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 116) 			strings += strlen(strings) + 1; /* skip NUL */
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 117) 			idx++;
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 118) 		}
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 119) 	}
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 120) 	return matched_idx;
+990d0f63ee (Denis Vlasenko           2007-07-24 15:54:42 +0000 121) }
+bfc3d82256 (Denis Vlasenko           2007-11-04 04:10:17 +0000 122) 
+defc1ea340 (Denis Vlasenko           2008-06-27 02:52:20 +0000 123) const char* FAST_FUNC nth_string(const char *strings, int n)
+bfc3d82256 (Denis Vlasenko           2007-11-04 04:10:17 +0000 124) {
+6b404431aa (Denis Vlasenko           2008-01-07 16:13:14 +0000 125) 	while (n) {
+c9fc15359e (Martin Lewis             2020-06-11 15:45:58 -0500 126) 		if (*strings++ == '\0') {
+c9fc15359e (Martin Lewis             2020-06-11 15:45:58 -0500 127) 			if (*strings == '\0') /* reached end of strings */
+c9fc15359e (Martin Lewis             2020-06-11 15:45:58 -0500 128) 				break;
+c9fc15359e (Martin Lewis             2020-06-11 15:45:58 -0500 129) 			n--;
+c9fc15359e (Martin Lewis             2020-06-11 15:45:58 -0500 130) 		}
+6b404431aa (Denis Vlasenko           2008-01-07 16:13:14 +0000 131) 	}
+6b404431aa (Denis Vlasenko           2008-01-07 16:13:14 +0000 132) 	return strings;
+bfc3d82256 (Denis Vlasenko           2007-11-04 04:10:17 +0000 133) }
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 134) 
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 135) #ifdef UNUSED_SO_FAR /* only brctl.c needs it yet */
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 136) /* Returns 0 for no, 1 for yes or a negative value on error.  */
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 137) smallint FAST_FUNC yesno(const char *str)
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 138) {
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 139) 	static const char no_yes[] ALIGN1 =
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 140) 		"0\0" "off\0" "no\0"
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 141) 		"1\0" "on\0" "yes\0";
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 142) 	int ret = index_in_substrings(no_yes, str);
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 143) 	return ret / 3;
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 144) }
+8a659f6ff9 (Denys Vlasenko           2010-04-03 00:52:16 +0200 145) #endif
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 146) 
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 147) #if ENABLE_UNIT_TEST
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 148) 
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 149) BBUNIT_DEFINE_TEST(is_prefixed_with)
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 150) {
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 151) 	BBUNIT_ASSERT_STREQ(" bar", is_prefixed_with("foo bar", "foo"));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 152) 	BBUNIT_ASSERT_STREQ("bar", is_prefixed_with("foo bar", "foo "));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 153) 	BBUNIT_ASSERT_STREQ("", is_prefixed_with("foo", "foo"));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 154) 	BBUNIT_ASSERT_STREQ("foo", is_prefixed_with("foo", ""));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 155) 	BBUNIT_ASSERT_STREQ("", is_prefixed_with("", ""));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 156) 
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 157) 	BBUNIT_ASSERT_NULL(is_prefixed_with("foo", "bar foo"));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 158) 	BBUNIT_ASSERT_NULL(is_prefixed_with("foo foo", "bar"));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 159) 	BBUNIT_ASSERT_NULL(is_prefixed_with("", "foo"));
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 160) 
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 161) 	BBUNIT_ENDTEST;
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 162) }
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 163) 
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 164) BBUNIT_DEFINE_TEST(is_suffixed_with)
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 165) {
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 166) 	BBUNIT_ASSERT_STREQ("bar", is_suffixed_with("foo bar", "bar"));
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 167) 	BBUNIT_ASSERT_STREQ("foo", is_suffixed_with("foo", "foo"));
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 168) 	BBUNIT_ASSERT_STREQ("", is_suffixed_with("foo", ""));
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 169) 	BBUNIT_ASSERT_STREQ("", is_suffixed_with("", ""));
+f085344d5c (Tito Ragusa              2015-09-15 23:38:01 +0200 170) 	BBUNIT_ASSERT_STREQ("foo", is_suffixed_with("barfoofoo", "foo"));
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 171) 
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 172) 	BBUNIT_ASSERT_NULL(is_suffixed_with("foo", "bar foo"));
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 173) 	BBUNIT_ASSERT_NULL(is_suffixed_with("foo foo", "bar"));
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 174) 	BBUNIT_ASSERT_NULL(is_suffixed_with("", "foo"));
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 175) 
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 176) 	BBUNIT_ENDTEST;
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 177) }
+7448b513c8 (Bartosz Golaszewski      2015-08-25 16:36:43 +0200 178) 
+b432923e29 (Bartosz Golaszewski      2015-08-25 13:09:59 +0200 179) #endif /* ENABLE_UNIT_TEST */

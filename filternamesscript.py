@@ -84,15 +84,13 @@ def splitDirectoryFromFile():
     result = []
     for dir in allFiles:
         x = dir.split("/") 
-        s = ""
+        dir = ""
         file = ""
-        for elem in x:
-            i = elem.find(".")
-            if(i < 0):
-                s += elem + "/"
-            else:
-                file = elem
-        result.append((s , file))
+        for i in range (len(x) - 1):         
+           dir += x[i] + "/"
+            
+        file = x[len(x) - 1]
+        result.append((dir , file))   
     return result
 
 def createCommand(directory , file):
@@ -127,7 +125,7 @@ def extractCommitsInfo():
             print(dirAndFile[0] + "/" + dirAndFile[1])
             print("##########################################")
             os.popen(cmd)
-            #time.sleep(2) 
+            time.sleep(2) 
             subprocess.run(["retrieve-info.sh"] , shell=True)
             extractAllContributors(contributors)
         else:
@@ -150,3 +148,5 @@ extractCommitsInfo()
 #extractIfDefFiles()
 
 #print(isFile("fahd") == True and isPackExtension("fahd.c") == False)
+
+#print(splitDirectoryFromFile())
