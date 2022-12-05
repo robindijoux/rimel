@@ -73,7 +73,8 @@ def extractIfDefFiles():
          with open('ifdef_found.txt', 'r') as f:
           for line in f:
                 x =  line.split(":")  
-                dict.add(x[0]) 
+                dict.add(x[0])
+         #print(dict)        
          return dict    
     except Exception as e:
         print(e)
@@ -98,6 +99,19 @@ def createCommand(directory , file):
     cmd = 'cd ' + directory[:-1] +  ' &git blame ' + file +  ' > C:/Users/user/Documents/GitHub/rimel/ifdef.txt'
     return cmd
 
+def isPackExtension(file):
+     i = file.find(".pack")
+     if i < 0:
+        return False
+     else:
+        return True 
+def isFile(file):
+     i = file.find(".")
+     if i < 0:
+        return False
+     else:
+        return True           
+
 def extractCommitsInfo(): 
    subprocess.run(["find-ifdef.sh", ""], shell= True)
    contributors = []
@@ -108,10 +122,16 @@ def extractCommitsInfo():
 #    subprocess.run(["retrieve-info.sh"] , shell=True)
 #    extractAllContributors(contributors)
    for dirAndFile in splitedFilesAndDirs:
-       os.popen(createCommand(dirAndFile[0] , dirAndFile[1]))
-       time.sleep(2) 
-       subprocess.run(["retrieve-info.sh"] , shell=True)
-       extractAllContributors(contributors)
+        if(isFile(dirAndFile[1]) == True and isPackExtension(dirAndFile[1]) == False):
+            cmd = createCommand(dirAndFile[0] , dirAndFile[1])
+            print(dirAndFile[0] + "/" + dirAndFile[1])
+            print("##########################################")
+            os.popen(cmd)
+            #time.sleep(2) 
+            subprocess.run(["retrieve-info.sh"] , shell=True)
+            extractAllContributors(contributors)
+        else:
+            continue    
    findPaternityOwner(contributors)
 
 
@@ -127,3 +147,6 @@ extractCommitsInfo()
 
 #print(fileMatcher("etworking/interface.c"))
 
+#extractIfDefFiles()
+
+#print(isFile("fahd") == True and isPackExtension("fahd.c") == False)

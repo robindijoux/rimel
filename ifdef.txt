@@ -1,710 +1,1115 @@
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   1) /* Based on ipsvd utilities written by Gerrit Pape <pape@smarden.org>
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   2)  * which are released into public domain by the author.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   3)  * Homepage: http://smarden.sunsite.dk/ipsvd/
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   4)  *
-d18f52bd18 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-02 12:53:15 +0000   5)  * Copyright (C) 2007 Denys Vlasenko.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   6)  *
-0ef64bdb40 networking/tcpudp.c (Denys Vlasenko           2010-08-16 20:14:46 +0200   7)  * Licensed under GPLv2, see file LICENSE in this source tree.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   8)  */
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000   9) 
-4866e905d7 networking/tcpudp.c (Denis Vlasenko           2008-03-17 09:17:27 +0000  10) /* Based on ipsvd-0.12.1. This tcpsvd accepts all options
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  11)  * which are supported by one from ipsvd-0.12.1, but not all are
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  12)  * functional. See help text at the end of this file for details.
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  13)  *
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  14)  * Code inside "#ifdef SSLSVD" is for sslsvd and is currently unused.
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  15)  *
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  16)  * Busybox version exports TCPLOCALADDR instead of
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  17)  * TCPLOCALIP + TCPLOCALPORT pair. ADDR more closely matches reality
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  18)  * (which is "struct sockaddr_XXX". Port is not a separate entity,
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  19)  * it's just a part of (AF_INET[6]) sockaddr!).
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  20)  *
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000  21)  * TCPORIGDSTADDR is Busybox-specific addition.
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  22)  *
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  23)  * udp server is hacked up by reusing TCP code. It has the following
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  24)  * limitation inherent in Unix DGRAM sockets implementation:
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000  25)  * - local IP address is retrieved (using recvmsg voodoo) but
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  26)  *   child's socket is not bound to it (bind cannot be called on
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000  27)  *   already bound socket). Thus it still can emit outgoing packets
-beaca811e4 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-13 16:32:26 +0000  28)  *   with wrong source IP...
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  29)  * - don't know how to retrieve ORIGDST for udp.
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  30)  */
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  31) //config:config TCPSVD
-b097a84d62 networking/tcpudp.c (Denys Vlasenko           2018-12-28 03:20:17 +0100  32) //config:	bool "tcpsvd (14 kb)"
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  33) //config:	default y
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  34) //config:	help
-72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  35) //config:	tcpsvd listens on a TCP port and runs a program for each new
-72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  36) //config:	connection.
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  37) //config:
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  38) //config:config UDPSVD
-4eed2c6c50 networking/tcpudp.c (Denys Vlasenko           2017-07-18 22:01:24 +0200  39) //config:	bool "udpsvd (13 kb)"
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  40) //config:	default y
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  41) //config:	help
-72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  42) //config:	udpsvd listens on an UDP port and runs a program for each new
-72089cf6b4 networking/tcpudp.c (Denys Vlasenko           2017-07-21 09:50:55 +0200  43) //config:	connection.
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  44) 
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  45) //applet:IF_TCPSVD(APPLET_ODDNAME(tcpsvd, tcpudpsvd, BB_DIR_USR_BIN, BB_SUID_DROP, tcpsvd))
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  46) //applet:IF_UDPSVD(APPLET_ODDNAME(udpsvd, tcpudpsvd, BB_DIR_USR_BIN, BB_SUID_DROP, udpsvd))
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  47) 
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  48) //kbuild:lib-$(CONFIG_TCPSVD) += tcpudp.o tcpudp_perhost.o
-47367e1d50 networking/tcpudp.c (Denys Vlasenko           2016-11-23 09:05:14 +0100  49) //kbuild:lib-$(CONFIG_UDPSVD) += tcpudp.o tcpudp_perhost.o
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000  50) 
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  51) //usage:#define tcpsvd_trivial_usage
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  52) //usage:       "[-hEv] [-c N] [-C N[:MSG]] [-b N] [-u USER] [-l NAME] IP PORT PROG"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  53) /* with not-implemented options: */
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  54) /* //usage:    "[-hpEvv] [-c N] [-C N[:MSG]] [-b N] [-u USER] [-l NAME] [-i DIR|-x CDB] [-t SEC] IP PORT PROG" */
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  55) //usage:#define tcpsvd_full_usage "\n\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  56) //usage:       "Create TCP socket, bind to IP:PORT and listen for incoming connections.\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  57) //usage:       "Run PROG for each connection.\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  58) //usage:     "\n	IP PORT		IP:PORT to listen on"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  59) //usage:     "\n	PROG ARGS	Program to run"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  60) //usage:     "\n	-u USER[:GRP]	Change to user/group after bind"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  61) //usage:     "\n	-c N		Up to N connections simultaneously (default 30)"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  62) //usage:     "\n	-b N		Allow backlog of approximately N TCP SYNs (default 20)"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  63) //usage:     "\n	-C N[:MSG]	Allow only up to N connections from the same IP:"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  64) //usage:     "\n			new connections from this IP address are closed"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  65) //usage:     "\n			immediately, MSG is written to the peer before close"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  66) //usage:     "\n	-E		Don't set up environment"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  67) //usage:     "\n	-h		Look up peer's hostname"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  68) //usage:     "\n	-l NAME		Local hostname (else look up local hostname in DNS)"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  69) //usage:     "\n	-v		Verbose"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  70) //usage:     "\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  71) //usage:     "\nEnvironment if no -E:"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  72) //usage:     "\nPROTO='TCP'"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  73) //usage:     "\nTCPREMOTEADDR='ip:port'" IF_FEATURE_IPV6(" ('[ip]:port' for IPv6)")
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  74) //usage:     "\nTCPLOCALADDR='ip:port'"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  75) //usage:     "\nTCPORIGDSTADDR='ip:port' of destination before firewall"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  76) //usage:     "\n	Useful for REDIRECTed-to-local connections:"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  77) //usage:     "\n	iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to 8080"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  78) //usage:     "\nTCPCONCURRENCY=num_of_connects_from_this_ip"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  79) //usage:     "\nIf -h:"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  80) //usage:     "\nTCPLOCALHOST='hostname' (-l NAME is used if specified)"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  81) //usage:     "\nTCPREMOTEHOST='hostname'"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  82) 
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  83) //usage:
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  84) //usage:#define udpsvd_trivial_usage
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  85) //usage:       "[-hEv] [-c N] [-u USER] [-l NAME] IP PORT PROG"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  86) //usage:#define udpsvd_full_usage "\n\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  87) //usage:       "Create UDP socket, bind to IP:PORT and wait for incoming packets.\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  88) //usage:       "Run PROG for each packet, redirecting all further packets with same\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  89) //usage:       "peer ip:port to it.\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  90) //usage:     "\n	IP PORT		IP:PORT to listen on"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  91) //usage:     "\n	PROG ARGS	Program to run"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  92) //usage:     "\n	-u USER[:GRP]	Change to user/group after bind"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  93) //usage:     "\n	-c N		Up to N connections simultaneously (default 30)"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  94) //usage:     "\n	-E		Don't set up environment"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  95) //usage:     "\n	-h		Look up peer's hostname"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  96) //usage:     "\n	-l NAME		Local hostname (else look up local hostname in DNS)"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200  97) //usage:     "\n	-v		Verbose"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  98) //usage:     "\n"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200  99) //usage:     "\nEnvironment if no -E:"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 100) //usage:     "\nPROTO='UDP'"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 101) //usage:     "\nUDPREMOTEADDR='ip:port'" IF_FEATURE_IPV6(" ('[ip]:port' for IPv6)")
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 102) //usage:     "\nUDPLOCALADDR='ip:port'"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 103) //usage:     "\nIf -h:"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 104) //usage:     "\nUDPLOCALHOST='hostname' (-l NAME is used if specified)"
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 105) //usage:     "\nUDPREMOTEHOST='hostname'"
-5bc8c005a8 networking/tcpudp.c (Pere Orga                2011-04-11 03:29:49 +0200 106) 
-b6adbf1be2 ipsvd/tcpudp.c      (Denis Vlasenko           2007-05-26 19:00:18 +0000 107) #include "libbb.h"
-e6a2f4cc5a networking/tcpudp.c (Denys Vlasenko           2016-04-21 16:26:30 +0200 108) #include "common_bufsiz.h"
-2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 109) 
-2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 110) #ifdef __linux__
-7890035452 networking/tcpudp.c (Denys Vlasenko           2017-01-02 10:46:08 +0100 111) /* from linux/netfilter_ipv4.h: */
-7890035452 networking/tcpudp.c (Denys Vlasenko           2017-01-02 10:46:08 +0100 112) # undef  SO_ORIGINAL_DST
-7890035452 networking/tcpudp.c (Denys Vlasenko           2017-01-02 10:46:08 +0100 113) # define SO_ORIGINAL_DST 80
-2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 114) #endif
-165f5b394f networking/tcpudp.c (Denis Vlasenko           2008-03-31 20:30:38 +0000 115) 
-4866e905d7 networking/tcpudp.c (Denis Vlasenko           2008-03-17 09:17:27 +0000 116) // TODO: move into this file:
-4866e905d7 networking/tcpudp.c (Denis Vlasenko           2008-03-17 09:17:27 +0000 117) #include "tcpudp_perhost.h"
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 118) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 119) #ifdef SSLSVD
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 120) #include "matrixSsl.h"
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 121) #include "ssl_io.h"
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 122) #endif
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 123) 
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 124) struct globals {
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 125) 	unsigned verbose;
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 126) 	unsigned max_per_host;
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 127) 	unsigned cur_per_host;
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 128) 	unsigned cnum;
-3f5fdc7572 ipsvd/tcpudp.c      (Denis Vlasenko           2007-10-14 04:55:59 +0000 129) 	unsigned cmax;
-d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 130) 	struct hcc *cc;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 131) 	char **env_cur;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 132) 	char *env_var[1]; /* actually bigger */
-98a4c7cf3d networking/tcpudp.c (Denys Vlasenko           2010-02-04 15:00:15 +0100 133) } FIX_ALIASING;
-e6a2f4cc5a networking/tcpudp.c (Denys Vlasenko           2016-04-21 16:26:30 +0200 134) #define G (*(struct globals*)bb_common_bufsiz1)
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 135) #define verbose      (G.verbose     )
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 136) #define max_per_host (G.max_per_host)
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 137) #define cur_per_host (G.cur_per_host)
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 138) #define cnum         (G.cnum        )
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 139) #define cmax         (G.cmax        )
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 140) #define env_cur      (G.env_cur     )
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 141) #define env_var      (G.env_var     )
-7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 142) #define INIT_G() do { \
-47cfbf32fd networking/tcpudp.c (Denys Vlasenko           2016-04-21 18:18:48 +0200 143) 	setup_common_bufsiz(); \
-7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 144) 	cmax = 30; \
-7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 145) 	env_cur = &env_var[0]; \
-7049ff8696 networking/tcpudp.c (Denis Vlasenko           2008-06-25 09:53:17 +0000 146) } while (0)
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 147) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 148) 
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 149) /* We have to be careful about leaking memory in repeated setenv's */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 150) static void xsetenv_plain(const char *n, const char *v)
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 151) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 152) 	char *var = xasprintf("%s=%s", n, v);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 153) 	*env_cur++ = var;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 154) 	putenv(var);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 155) }
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 156) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 157) static void xsetenv_proto(const char *proto, const char *n, const char *v)
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 158) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 159) 	char *var = xasprintf("%s%s=%s", proto, n, v);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 160) 	*env_cur++ = var;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 161) 	putenv(var);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 162) }
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 163) 
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 164) static void undo_xsetenv(void)
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 165) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 166) 	char **pp = env_cur = &env_var[0];
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 167) 	while (*pp) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 168) 		char *var = *pp;
-dd8adde386 networking/tcpudp.c (Denys Vlasenko           2010-06-24 05:00:50 +0200 169) 		bb_unsetenv_and_free(var);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 170) 		*pp++ = NULL;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 171) 	}
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 172) }
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 173) 
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 174) static void sig_term_handler(int sig)
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 175) {
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 176) 	if (verbose)
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 177) 		bb_error_msg("got signal %u, exit", sig);
-400d8bb45e ipsvd/tcpudp.c      (Denis Vlasenko           2008-02-24 13:36:01 +0000 178) 	kill_myself_with_sig(sig);
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 179) }
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 180) 
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 181) /* Little bloated, but tries to give accurate info how child exited.
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 182)  * Makes easier to spot segfaulting children etc... */
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 183) static void print_waitstat(unsigned pid, int wstat)
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 184) {
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 185) 	unsigned e = 0;
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 186) 	const char *cause = "?exit";
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 187) 
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 188) 	if (WIFEXITED(wstat)) {
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 189) 		cause++;
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 190) 		e = WEXITSTATUS(wstat);
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 191) 	} else if (WIFSIGNALED(wstat)) {
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 192) 		cause = "signal";
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 193) 		e = WTERMSIG(wstat);
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 194) 	}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 195) 	bb_error_msg("end %d %s %d", pid, cause, e);
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 196) }
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 197) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 198) /* Must match getopt32 in main! */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 199) enum {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 200) 	OPT_c = (1 << 0),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 201) 	OPT_C = (1 << 1),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 202) 	OPT_i = (1 << 2),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 203) 	OPT_x = (1 << 3),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 204) 	OPT_u = (1 << 4),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 205) 	OPT_l = (1 << 5),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 206) 	OPT_E = (1 << 6),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 207) 	OPT_b = (1 << 7),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 208) 	OPT_h = (1 << 8),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 209) 	OPT_p = (1 << 9),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 210) 	OPT_t = (1 << 10),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 211) 	OPT_v = (1 << 11),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 212) 	OPT_V = (1 << 12),
-57a426b15b ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 10:59:33 +0000 213) 	OPT_U = (1 << 13), /* from here: sslsvd only */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 214) 	OPT_slash = (1 << 14),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 215) 	OPT_Z = (1 << 15),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 216) 	OPT_K = (1 << 16),
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 217) };
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 218) 
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 219) static void if_verbose_print_connection_status(void)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 220) {
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 221) 	if (verbose) {
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 222) 		/* "only 1 client max" desn't need this */
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 223) 		if (cmax > 1)
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 224) 			bb_error_msg("status %u/%u", cnum, cmax);
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 225) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 226) }
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 227) 
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 228) /* SIGCHLD handler is reentrancy-safe because SIGCHLD is unmasked
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 229)  * only over accept() or recvfrom() calls, not over memory allocations
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 230)  * or printouts. Do need to save/restore errno in order not to mangle
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 231)  * these syscalls' error code, if any.
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 232)  */
-a60f84ebf0 networking/tcpudp.c (Denis Vlasenko           2008-07-05 09:18:54 +0000 233) static void sig_child_handler(int sig UNUSED_PARAM)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 234) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 235) 	int wstat;
-3854c5ddf4 networking/tcpudp.c (Denis Vlasenko           2008-11-06 22:39:57 +0000 236) 	pid_t pid;
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 237) 	int sv_errno = errno;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 238) 
-fb0eba706c ipsvd/tcpudp.c      (Denis Vlasenko           2008-01-02 19:55:04 +0000 239) 	while ((pid = wait_any_nohang(&wstat)) > 0) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 240) 		if (max_per_host)
-d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 241) 			ipsvd_perhost_remove(G.cc, pid);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 242) 		if (cnum)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 243) 			cnum--;
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 244) 		if (verbose)
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 245) 			print_waitstat(pid, wstat);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 246) 	}
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 247) 	if_verbose_print_connection_status();
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 248) 	errno = sv_errno;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 249) }
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 250) 
-9b49a5ed85 ipsvd/tcpudp.c      (Denis Vlasenko           2007-10-11 10:05:36 +0000 251) int tcpudpsvd_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
-a60f84ebf0 networking/tcpudp.c (Denis Vlasenko           2008-07-05 09:18:54 +0000 252) int tcpudpsvd_main(int argc UNUSED_PARAM, char **argv)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 253) {
-1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 254) 	char *str_C, *str_t;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 255) 	char *user;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 256) 	struct hcc *hccp;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 257) 	const char *instructs;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 258) 	char *msg_per_host = NULL;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 259) 	unsigned len_per_host = len_per_host; /* gcc */
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 260) #ifndef SSLSVD
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 261) 	struct bb_uidgid_t ugid;
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 262) #endif
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 263) 	bool tcp;
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 264) 	uint16_t local_port;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 265) 	char *preset_local_hostname = NULL;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 266) 	char *remote_hostname = remote_hostname; /* for compiler */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 267) 	char *remote_addr = remote_addr; /* for compiler */
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 268) 	len_and_sockaddr *lsa;
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 269) 	len_and_sockaddr local, remote;
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 270) 	socklen_t sa_len;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 271) 	int pid;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 272) 	int sock;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 273) 	int conn;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 274) 	unsigned backlog = 20;
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 275) 	unsigned opts;
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 276) 
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 277) 	INIT_G();
-b925605441 ipsvd/tcpudp.c      (Denis Vlasenko           2007-09-28 10:29:17 +0000 278) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 279) 	tcp = (applet_name[0] == 't');
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 280) 
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 281) 	/* "+": stop on first non-option */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 282) #ifdef SSLSVD
-22542eca18 networking/tcpudp.c (Denys Vlasenko           2017-08-08 21:55:02 +0200 283) 	opts = getopt32(argv, "^+"
-22542eca18 networking/tcpudp.c (Denys Vlasenko           2017-08-08 21:55:02 +0200 284) 		"c:+C:i:x:u:l:Eb:+hpt:vU:/:Z:K:" /* -c NUM, -b NUM */
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 285) 		"\0"
-22542eca18 networking/tcpudp.c (Denys Vlasenko           2017-08-08 21:55:02 +0200 286) 		/* 3+ args, -i at most once, -p implies -h, -v is a counter */
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 287) 		"-3:i--i:ph:vv",
-1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 288) 		&cmax, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
-1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 289) 		&backlog, &str_t, &ssluser, &root, &cert, &key, &verbose
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 290) 	);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 291) #else
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 292) 	opts = getopt32(argv, "^+"
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 293) 		"c:+C:i:x:u:l:Eb:+hpt:v" /* -c NUM, -b NUM */
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 294) 		"\0"
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 295) 		/* 3+ args, -i at most once, -p implies -h, -v is a counter */
-bbe47d9b9a networking/tcpudp.c (Denys Vlasenko           2018-03-11 23:02:50 +0100 296) 		"-3:i--i:ph:vv",
-1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 297) 		&cmax, &str_C, &instructs, &instructs, &user, &preset_local_hostname,
-1d42665b6b ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:09:09 +0000 298) 		&backlog, &str_t, &verbose
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 299) 	);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 300) #endif
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 301) 	if (opts & OPT_C) { /* -C n[:message] */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 302) 		max_per_host = bb_strtou(str_C, &str_C, 10);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 303) 		if (str_C[0]) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 304) 			if (str_C[0] != ':')
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 305) 				bb_show_usage();
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 306) 			msg_per_host = str_C + 1;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 307) 			len_per_host = strlen(msg_per_host);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 308) 		}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 309) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 310) 	if (max_per_host > cmax)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 311) 		max_per_host = cmax;
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 312) 	if (opts & OPT_u) {
-d73cbd31a2 networking/tcpudp.c (Bernhard Reutner-Fischer 2008-07-21 14:41:33 +0000 313) 		xget_uidgid(&ugid, user);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 314) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 315) #ifdef SSLSVD
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 316) 	if (opts & OPT_U) ssluser = optarg;
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 317) 	if (opts & OPT_slash) root = optarg;
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 318) 	if (opts & OPT_Z) cert = optarg;
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 319) 	if (opts & OPT_K) key = optarg;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 320) #endif
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 321) 	argv += optind;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 322) 	if (!argv[0][0] || LONE_CHAR(argv[0], '0'))
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 323) 		argv[0] = (char*)"0.0.0.0";
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 324) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 325) 	/* Per-IP flood protection is not thought-out for UDP */
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 326) 	if (!tcp)
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 327) 		max_per_host = 0;
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 328) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 329) 	bb_sanitize_stdio(); /* fd# 0,1,2 must be opened */
-992e05b6f0 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-03 01:13:04 +0000 330) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 331) #ifdef SSLSVD
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 332) 	sslser = user;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 333) 	client = 0;
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 334) 	if ((getuid() == 0) && !(opts & OPT_u)) {
-e789c3bea1 networking/tcpudp.c (Jan Luebbe               2018-02-14 14:05:27 +0100 335) 		xfunc_error_retval = 100;
-6937487be7 networking/tcpudp.c (James Byrne              2019-07-02 11:35:03 +0200 336) 		bb_simple_error_msg_and_die(bb_msg_you_must_be_root);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 337) 	}
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 338) 	if (opts & OPT_u)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 339) 		if (!uidgid_get(&sslugid, ssluser, 1)) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 340) 			if (errno) {
-d73cbd31a2 networking/tcpudp.c (Bernhard Reutner-Fischer 2008-07-21 14:41:33 +0000 341) 				bb_perror_msg_and_die("can't get user/group: %s", ssluser);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 342) 			}
-d73cbd31a2 networking/tcpudp.c (Bernhard Reutner-Fischer 2008-07-21 14:41:33 +0000 343) 			bb_error_msg_and_die("unknown user/group %s", ssluser);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 344) 		}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 345) 	if (!cert) cert = "./cert.pem";
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 346) 	if (!key) key = cert;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 347) 	if (matrixSslOpen() < 0)
-6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 348) 		fatal("can't initialize ssl");
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 349) 	if (matrixSslReadKeys(&keys, cert, key, 0, ca) < 0) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 350) 		if (client)
-6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 351) 			fatal("can't read cert, key, or ca file");
-6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 352) 		fatal("can't read cert or key file");
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 353) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 354) 	if (matrixSslNewSession(&ssl, keys, 0, SSL_FLAGS_SERVER) < 0)
-6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 355) 		fatal("can't create ssl session");
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 356) #endif
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 357) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 358) 	sig_block(SIGCHLD);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 359) 	signal(SIGCHLD, sig_child_handler);
-cf7cf62204 networking/tcpudp.c (Denis Vlasenko           2008-03-19 19:38:46 +0000 360) 	bb_signals(BB_FATAL_SIGS, sig_term_handler);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 361) 	signal(SIGPIPE, SIG_IGN);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 362) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 363) 	if (max_per_host)
-d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 364) 		G.cc = ipsvd_perhost_init(cmax);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 365) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 366) 	local_port = bb_lookup_port(argv[1], tcp ? "tcp" : "udp", 0);
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 367) 	lsa = xhost2sockaddr(argv[0], local_port);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 368) 	argv += 2;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 369) 
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 370) 	sock = xsocket(lsa->u.sa.sa_family, tcp ? SOCK_STREAM : SOCK_DGRAM, 0);
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 371) 	setsockopt_reuseaddr(sock);
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 372) 	sa_len = lsa->len; /* I presume sockaddr len stays the same */
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 373) 	xbind(sock, &lsa->u.sa, sa_len);
-16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 374) 	if (tcp) {
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 375) 		xlisten(sock, backlog);
-16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 376) 		close_on_exec_on(sock);
-16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 377) 	} else { /* udp: needed for recv_from_to to work: */
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 378) 		socket_want_pktinfo(sock);
-16635cc2e0 networking/tcpudp.c (Denys Vlasenko           2009-06-13 22:49:08 +0200 379) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 380) 	/* ndelay_off(sock); - it is the default I think? */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 381) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 382) #ifndef SSLSVD
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 383) 	if (opts & OPT_u) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 384) 		/* drop permissions */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 385) 		xsetgid(ugid.gid);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 386) 		xsetuid(ugid.uid);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 387) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 388) #endif
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 389) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 390) 	if (verbose) {
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 391) 		char *addr = xmalloc_sockaddr2dotted(&lsa->u.sa);
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 392) 		if (opts & OPT_u)
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 393) 			bb_error_msg("listening on %s, starting, uid %u, gid %u", addr,
-60fadaca28 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 19:10:36 +0000 394) 				(unsigned)ugid.uid, (unsigned)ugid.gid);
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 395) 		else
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 396) 			bb_error_msg("listening on %s, starting", addr);
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 397) 		free(addr);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 398) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 399) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 400) 	/* Main accept() loop */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 401) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 402)  again:
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 403) 	hccp = NULL;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 404) 
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 405)  again1:
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 406) 	close(0);
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 407) 	/* It's important to close(0) _before_ wait loop:
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 408) 	 * fd#0 can be a shared connection fd.
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 409) 	 * If kept open by us, peer can't detect PROG closing it.
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 410) 	 */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 411) 	while (cnum >= cmax)
-3f165fa5b3 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:29:08 +0000 412) 		wait_for_any_sig(); /* expecting SIGCHLD */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 413) 
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 414)  again2:
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 415) 	sig_unblock(SIGCHLD);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 416) 	local.len = remote.len = sa_len;
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 417) 	if (tcp) {
-ec1ea16337 networking/tcpudp.c (Denys Vlasenko           2016-10-07 15:56:47 +0200 418) 		/* Accept a connection to fd #0 */
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 419) 		conn = accept(sock, &remote.u.sa, &remote.len);
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 420) 	} else {
-1ca332b367 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 17:49:47 +0000 421) 		/* In case recv_from_to won't be able to recover local addr.
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 422) 		 * Also sets port - recv_from_to is unable to do it. */
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 423) 		local = *lsa;
-aa9b1828b9 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 09:10:39 +0000 424) 		conn = recv_from_to(sock, NULL, 0, MSG_PEEK,
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 425) 				&remote.u.sa, &local.u.sa, sa_len);
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 426) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 427) 	sig_block(SIGCHLD);
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 428) 	if (conn < 0) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 429) 		if (errno != EINTR)
-6937487be7 networking/tcpudp.c (James Byrne              2019-07-02 11:35:03 +0200 430) 			bb_simple_perror_msg(tcp ? "accept" : "recv");
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 431) 		goto again2;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 432) 	}
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 433) 	xmove_fd(tcp ? conn : sock, 0);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 434) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 435) 	if (max_per_host) {
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 436) 		/* Drop connection immediately if cur_per_host > max_per_host
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 437) 		 * (minimizing load under SYN flood) */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 438) 		remote_addr = xmalloc_sockaddr2dotted_noport(&remote.u.sa);
-d82ea2ba8f networking/tcpudp.c (Denys Vlasenko           2018-02-27 13:03:44 +0100 439) 		cur_per_host = ipsvd_perhost_add(G.cc, remote_addr, max_per_host, &hccp);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 440) 		if (cur_per_host > max_per_host) {
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 441) 			/* ipsvd_perhost_add detected that max is exceeded
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 442) 			 * (and did not store ip in connection table) */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 443) 			free(remote_addr);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 444) 			if (msg_per_host) {
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 445) 				/* don't block or test for errors */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 446) 				send(0, msg_per_host, len_per_host, MSG_DONTWAIT);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 447) 			}
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 448) 			goto again1;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 449) 		}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 450) 		/* NB: remote_addr is not leaked, it is stored in conn table */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 451) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 452) 
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 453) 	if (!tcp) {
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 454) 		/* Voodoo magic: making udp sockets each receive its own
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 455) 		 * packets is not trivial, and I still not sure
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 456) 		 * I do it 100% right.
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 457) 		 * 1) we have to do it before fork()
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 458) 		 * 2) order is important - is it right now? */
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 459) 
-4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 460) 		/* Open new non-connected UDP socket for further clients... */
-4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 461) 		sock = xsocket(lsa->u.sa.sa_family, SOCK_DGRAM, 0);
-4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 462) 		setsockopt_reuseaddr(sock);
-4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 463) 		/* Make plain write/send work for old socket by supplying default
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 464) 		 * destination address. This also restricts incoming packets
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 465) 		 * to ones coming from this remote IP. */
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 466) 		xconnect(0, &remote.u.sa, sa_len);
-64a15124e7 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 10:16:15 +0000 467) 	/* hole? at this point we have no wildcard udp socket...
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 468) 	 * can this cause clients to get "port unreachable" icmp?
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 469) 	 * Yup, time window is very small, but it exists (does it?) */
-4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 470) 		/* ..."open new socket", continued */
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 471) 		xbind(sock, &lsa->u.sa, sa_len);
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 472) 		socket_want_pktinfo(sock);
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 473) 
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 474) 		/* Doesn't work:
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 475) 		 * we cannot replace fd #0 - we will lose pending packet
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 476) 		 * which is already buffered for us! And we cannot use fd #1
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 477) 		 * instead - it will "intercept" all following packets, but child
-f87f495e65 ipsvd/tcpudp.c      (Denis Vlasenko           2007-08-24 10:27:41 +0000 478) 		 * does not expect data coming *from fd #1*! */
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 479) #if 0
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 480) 		/* Make it so that local addr is fixed to localp->u.sa
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 481) 		 * and we don't accidentally accept packets to other local IPs. */
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 482) 		/* NB: we possibly bind to the _very_ same_ address & port as the one
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 483) 		 * already bound in parent! This seems to work in Linux.
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 484) 		 * (otherwise we can move socket to fd #0 only if bind succeeds) */
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 485) 		close(0);
-ca18311d0a networking/tcpudp.c (Denys Vlasenko           2011-04-07 17:52:20 +0200 486) 		set_nport(&localp->u.sa, htons(local_port));
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 487) 		xmove_fd(xsocket(localp->u.sa.sa_family, SOCK_DGRAM, 0), 0);
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 488) 		setsockopt_reuseaddr(0); /* crucial */
-8c69afd992 ipsvd/tcpudp.c      (Bernhard Reutner-Fischer 2008-01-29 10:33:34 +0000 489) 		xbind(0, &localp->u.sa, localp->len);
-794687947f ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-04 11:02:55 +0000 490) #endif
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 491) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 492) 
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 493) 	pid = vfork();
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 494) 	if (pid == -1) {
-6937487be7 networking/tcpudp.c (James Byrne              2019-07-02 11:35:03 +0200 495) 		bb_simple_perror_msg("vfork");
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 496) 		goto again;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 497) 	}
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 498) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 499) 	if (pid != 0) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 500) 		/* Parent */
-02fd66885c ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 23:23:10 +0000 501) 		cnum++;
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 502) 		if_verbose_print_connection_status();
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 503) 		if (hccp)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 504) 			hccp->pid = pid;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 505) 		/* clean up changes done by vforked child */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 506) 		undo_xsetenv();
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 507) 		goto again;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 508) 	}
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 509) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 510) 	/* Child: prepare env, log, and exec prog */
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 511) 
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 512) 	{ /* vfork alert! every xmalloc in this block should be freed! */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 513) 		char *local_hostname = local_hostname; /* for compiler */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 514) 		char *local_addr = NULL;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 515) 		char *free_me0 = NULL;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 516) 		char *free_me1 = NULL;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 517) 		char *free_me2 = NULL;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 518) 
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 519) 		if (verbose || !(opts & OPT_E)) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 520) 			if (!max_per_host) /* remote_addr is not yet known */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 521) 				free_me0 = remote_addr = xmalloc_sockaddr2dotted(&remote.u.sa);
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 522) 			if (opts & OPT_h) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 523) 				free_me1 = remote_hostname = xmalloc_sockaddr2host_noport(&remote.u.sa);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 524) 				if (!remote_hostname) {
-6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 525) 					bb_error_msg("can't look up hostname for %s", remote_addr);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 526) 					remote_hostname = remote_addr;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 527) 				}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 528) 			}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 529) 			/* Find out local IP peer connected to.
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 530) 			 * Errors ignored (I'm not paranoid enough to imagine kernel
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 531) 			 * which doesn't know local IP). */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 532) 			if (tcp)
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 533) 				getsockname(0, &local.u.sa, &local.len);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 534) 			/* else: for UDP it is done earlier by parent */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 535) 			local_addr = xmalloc_sockaddr2dotted(&local.u.sa);
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 536) 			if (opts & OPT_h) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 537) 				local_hostname = preset_local_hostname;
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 538) 				if (!local_hostname) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 539) 					free_me2 = local_hostname = xmalloc_sockaddr2host_noport(&local.u.sa);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 540) 					if (!local_hostname)
-6331cf059c networking/tcpudp.c (Denys Vlasenko           2009-11-13 09:08:27 +0100 541) 						bb_error_msg_and_die("can't look up hostname for %s", local_addr);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 542) 				}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 543) 				/* else: local_hostname is not NULL, but is NOT malloced! */
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 544) 			}
-b933ac1e25 ipsvd/tcpudp.c      (Denis Vlasenko           2007-04-03 12:09:46 +0000 545) 		}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 546) 		if (verbose) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 547) 			pid = getpid();
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 548) 			if (max_per_host) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 549) 				bb_error_msg("concurrency %s %u/%u",
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 550) 					remote_addr,
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 551) 					cur_per_host, max_per_host);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 552) 			}
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 553) 			bb_error_msg((opts & OPT_h)
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 554) 				? "start %u %s-%s (%s-%s)"
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 555) 				: "start %u %s-%s",
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 556) 				pid,
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 557) 				local_addr, remote_addr,
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 558) 				local_hostname, remote_hostname);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 559) 		}
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 560) 
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 561) 		if (!(opts & OPT_E)) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 562) 			/* setup ucspi env */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 563) 			const char *proto = tcp ? "TCP" : "UDP";
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 564) 
-2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 565) #ifdef SO_ORIGINAL_DST
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 566) 			/* Extract "original" destination addr:port
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 567) 			 * from Linux firewall. Useful when you redirect
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 568) 			 * an outbond connection to local handler, and it needs
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 569) 			 * to know where it originally tried to connect */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 570) 			if (tcp && getsockopt(0, SOL_IP, SO_ORIGINAL_DST, &local.u.sa, &local.len) == 0) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 571) 				char *addr = xmalloc_sockaddr2dotted(&local.u.sa);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 572) 				xsetenv_plain("TCPORIGDSTADDR", addr);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 573) 				free(addr);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 574) 			}
-2ea12d8b6d networking/tcpudp.c (Jeremie Koenig           2010-05-27 15:46:25 +0200 575) #endif
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 576) 			xsetenv_plain("PROTO", proto);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 577) 			xsetenv_proto(proto, "LOCALADDR", local_addr);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 578) 			xsetenv_proto(proto, "REMOTEADDR", remote_addr);
-d6513cff17 networking/tcpudp.c (Denys Vlasenko           2009-07-19 23:07:13 +0200 579) 			if (opts & OPT_h) {
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 580) 				xsetenv_proto(proto, "LOCALHOST", local_hostname);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 581) 				xsetenv_proto(proto, "REMOTEHOST", remote_hostname);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 582) 			}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 583) 			//compat? xsetenv_proto(proto, "REMOTEINFO", "");
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 584) 			/* additional */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 585) 			if (cur_per_host > 0) /* can not be true for udp */
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 586) 				xsetenv_plain("TCPCONCURRENCY", utoa(cur_per_host));
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 587) 		}
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 588) 		free(local_addr);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 589) 		free(free_me0);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 590) 		free(free_me1);
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 591) 		free(free_me2);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 592) 	}
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 593) 
-aefed941c2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-17 08:35:44 +0000 594) 	xdup2(0, 1);
-992e05b6f0 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-03 01:13:04 +0000 595) 
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 596) 	/* Restore signal handling for the to-be-execed process */
-3fa36e2350 networking/tcpudp.c (Denis Vlasenko           2008-11-09 00:15:11 +0000 597) 	signal(SIGPIPE, SIG_DFL); /* this one was SIG_IGNed */
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 598) 	/* Non-ignored signals revert to SIG_DFL on exec anyway
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 599) 	 * But we can get signals BEFORE execvp(), this is unlikely
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 600) 	 * but it would invoke sig_child_handler(), which would
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 601) 	 * check waitpid(WNOHANG), then print "status N/M" if verbose.
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 602) 	 * I guess we can live with that possibility.
-d3e1090308 networking/tcpudp.c (Denys Vlasenko           2021-06-05 15:24:04 +0200 603) 	 */
-3fa36e2350 networking/tcpudp.c (Denis Vlasenko           2008-11-09 00:15:11 +0000 604) 	/*signal(SIGCHLD, SIG_DFL);*/
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 605) 	sig_unblock(SIGCHLD);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 606) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 607) #ifdef SSLSVD
-4cf1d08fc2 ipsvd/tcpudp.c      (Denis Vlasenko           2008-03-12 23:13:50 +0000 608) 	strcpy(id, utoa(pid));
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 609) 	ssl_io(0, argv);
-21e8e8da64 networking/tcpudp.c (Pascal Bellard           2010-07-04 00:57:03 +0200 610) 	bb_perror_msg_and_die("can't execute '%s'", argv[0]);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 611) #else
-21e8e8da64 networking/tcpudp.c (Pascal Bellard           2010-07-04 00:57:03 +0200 612) 	BB_EXECVP_or_die(argv);
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 613) #endif
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 614) }
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 615) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 616) /*
-57a426b15b ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 10:59:33 +0000 617) tcpsvd [-hpEvv] [-c n] [-C n:msg] [-b n] [-u user] [-l name]
-57a426b15b ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 10:59:33 +0000 618) 	[-i dir|-x cdb] [ -t sec] host port prog
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 619) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 620) tcpsvd creates a TCP/IP socket, binds it to the address host:port,
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 621) and listens on the socket for incoming connections.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 622) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 623) On each incoming connection, tcpsvd conditionally runs a program,
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 624) with standard input reading from the socket, and standard output
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 625) writing to the socket, to handle this connection. tcpsvd keeps
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 626) listening on the socket for new connections, and can handle
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 627) multiple connections simultaneously.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 628) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 629) tcpsvd optionally checks for special instructions depending
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 630) on the IP address or hostname of the client that initiated
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 631) the connection, see ipsvd-instruct(5).
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 632) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 633) host
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 634)     host either is a hostname, or a dotted-decimal IP address,
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 635)     or 0. If host is 0, tcpsvd accepts connections to any local
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 636)     IP address.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 637)     * busybox accepts IPv6 addresses and host:port pairs too
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 638)       In this case second parameter is ignored
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 639) port
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 640)     tcpsvd accepts connections to host:port. port may be a name
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 641)     from /etc/services or a number.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 642) prog
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 643)     prog consists of one or more arguments. For each connection,
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 644)     tcpsvd normally runs prog, with file descriptor 0 reading from
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 645)     the network, and file descriptor 1 writing to the network.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 646)     By default it also sets up TCP-related environment variables,
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 647)     see tcp-environ(5)
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 648) -i dir
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 649)     read instructions for handling new connections from the instructions
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 650)     directory dir. See ipsvd-instruct(5) for details.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 651)     * ignored by busyboxed version
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 652) -x cdb
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 653)     read instructions for handling new connections from the constant database
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 654)     cdb. The constant database normally is created from an instructions
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 655)     directory by running ipsvd-cdb(8).
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 656)     * ignored by busyboxed version
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 657) -t sec
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 658)     timeout. This option only takes effect if the -i option is given.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 659)     While checking the instructions directory, check the time of last access
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 660)     of the file that matches the clients address or hostname if any, discard
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 661)     and remove the file if it wasn't accessed within the last sec seconds;
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 662)     tcpsvd does not discard or remove a file if the user's write permission
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 663)     is not set, for those files the timeout is disabled. Default is 0,
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 664)     which means that the timeout is disabled.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 665)     * ignored by busyboxed version
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 666) -l name
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 667)     local hostname. Do not look up the local hostname in DNS, but use name
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 668)     as hostname. This option must be set if tcpsvd listens on port 53
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 669)     to avoid loops.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 670) -u user[:group]
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 671)     drop permissions. Switch user ID to user's UID, and group ID to user's
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 672)     primary GID after creating and binding to the socket. If user is followed
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 673)     by a colon and a group name, the group ID is switched to the GID of group
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 674)     instead. All supplementary groups are removed.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 675) -c n
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 676)     concurrency. Handle up to n connections simultaneously. Default is 30.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 677)     If there are n connections active, tcpsvd defers acceptance of a new
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 678)     connection until an active connection is closed.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 679) -C n[:msg]
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 680)     per host concurrency. Allow only up to n connections from the same IP
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 681)     address simultaneously. If there are n active connections from one IP
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 682)     address, new incoming connections from this IP address are closed
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 683)     immediately. If n is followed by :msg, the message msg is written
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 684)     to the client if possible, before closing the connection. By default
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 685)     msg is empty. See ipsvd-instruct(5) for supported escape sequences in msg.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 686) 
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 687)     For each accepted connection, the current per host concurrency is
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 688)     available through the environment variable TCPCONCURRENCY. n and msg
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 689)     can be overwritten by ipsvd(7) instructions, see ipsvd-instruct(5).
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 690)     By default tcpsvd doesn't keep track of connections.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 691) -h
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 692)     Look up the client's hostname in DNS.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 693) -p
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 694)     paranoid. After looking up the client's hostname in DNS, look up the IP
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 695)     addresses in DNS for that hostname, and forget about the hostname
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 696)     if none of the addresses match the client's IP address. You should
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 697)     set this option if you use hostname based instructions. The -p option
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 698)     implies the -h option.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 699)     * ignored by busyboxed version
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 700) -b n
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 701)     backlog. Allow a backlog of approximately n TCP SYNs. On some systems n
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 702)     is silently limited. Default is 20.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 703) -E
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 704)     no special environment. Do not set up TCP-related environment variables.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 705) -v
-10ad622dc2 networking/tcpudp.c (Denys Vlasenko           2017-04-17 16:13:32 +0200 706)     verbose. Print verbose messages to standard output.
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 707) -vv
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 708)     more verbose. Print more verbose messages to standard output.
-ba2fb719b9 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 09:39:03 +0000 709)     * no difference between -v and -vv in busyboxed version
-2856dab477 ipsvd/tcpsvd.c      (Denis Vlasenko           2007-04-01 01:18:20 +0000 710) */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    1) /* vi: set sw=4 ts=4: */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    2) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    3)  * fsck --- A generic, parallelizing front-end for the fsck program.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    4)  * It will automatically try to run fsck programs in parallel if the
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    5)  * devices are on separate spindles.  It is based on the same ideas as
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    6)  * the generic front end for fsck by David Engel and Fred van Kempen,
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    7)  * but it has been completely rewritten from scratch to support
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    8)  * parallel execution.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000    9)  *
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   10)  * Written by Theodore Ts'o, <tytso@mit.edu>
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   11)  *
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   12)  * Miquel van Smoorenburg (miquels@drinkel.ow.org) 20-Oct-1994:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   13)  *   o Changed -t fstype to behave like with mount when -A (all file
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   14)  *     systems) or -M (like mount) is specified.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   15)  *   o fsck looks if it can find the fsck.type program to decide
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   16)  *     if it should ignore the fs type. This way more fsck programs
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   17)  *     can be added without changing this front-end.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   18)  *   o -R flag skip root file system.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   19)  *
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   20)  * Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   21)  *      2001, 2002, 2003, 2004, 2005 by  Theodore Ts'o.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   22)  *
+0ef64bdb40 (Denys Vlasenko 2010-08-16 20:14:46 +0200   23)  * Licensed under GPLv2, see file LICENSE in this source tree.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   24)  */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   25) 
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   26) /* All filesystem specific hooks have been removed.
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   27)  * If filesystem cannot be determined, we will execute
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   28)  * "fsck.auto". Currently this also happens if you specify
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   29)  * UUID=xxx or LABEL=xxx as an object to check.
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   30)  * Detection code for that is also probably has to be in fsck.auto.
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   31)  *
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   32)  * In other words, this is _really_ is just a driver program which
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   33)  * spawns actual fsck.something for each filesystem to check.
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   34)  * It doesn't guess filesystem types from on-disk format.
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   35)  */
+000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   36) //config:config FSCK
+b097a84d62 (Denys Vlasenko 2018-12-28 03:20:17 +0100   37) //config:	bool "fsck (7.4 kb)"
+000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   38) //config:	default y
+000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   39) //config:	help
+72089cf6b4 (Denys Vlasenko 2017-07-21 09:50:55 +0200   40) //config:	fsck is used to check and optionally repair one or more filesystems.
+72089cf6b4 (Denys Vlasenko 2017-07-21 09:50:55 +0200   41) //config:	In actuality, fsck is simply a front-end for the various file system
+72089cf6b4 (Denys Vlasenko 2017-07-21 09:50:55 +0200   42) //config:	checkers (fsck.fstype) available under Linux.
+000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   43) 
+000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   44) //applet:IF_FSCK(APPLET(fsck, BB_DIR_SBIN, BB_SUID_DROP))
+000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   45) 
+000eda41c0 (Denys Vlasenko 2015-10-18 22:40:23 +0200   46) //kbuild:lib-$(CONFIG_FSCK) += fsck.o
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   47) 
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   48) //usage:#define fsck_trivial_usage
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200   49) //usage:       "[-ANPRTV] [-t FSTYPE] [FS_OPTS] [BLOCKDEV]..."
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   50) //usage:#define fsck_full_usage "\n\n"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   51) //usage:       "Check and repair filesystems\n"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   52) //usage:     "\n	-A	Walk /etc/fstab and check all filesystems"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   53) //usage:     "\n	-N	Don't execute, just show what would be done"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   54) //usage:     "\n	-P	With -A, check filesystems in parallel"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   55) //usage:     "\n	-R	With -A, skip the root filesystem"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   56) //usage:     "\n	-T	Don't show title on startup"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   57) //usage:     "\n	-V	Verbose"
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200   58) //DO_PROGRESS_INDICATOR is off:
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200   59) ////usage:     "\n	-C FD	Write status information to specified file descriptor"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   60) //usage:     "\n	-t TYPE	List of filesystem types to check"
+6a3e01d5a9 (Pere Orga      2011-04-01 22:56:30 +0200   61) 
+b6adbf1be2 (Denis Vlasenko 2007-05-26 19:00:18 +0000   62) #include "libbb.h"
+e6a2f4cc5a (Denys Vlasenko 2016-04-21 16:26:30 +0200   63) #include "common_bufsiz.h"
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   64) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   65) /* "progress indicator" code is somewhat buggy and ext[23] specific.
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   66)  * We should be filesystem agnostic. IOW: there should be a well-defined
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   67)  * API for fsck.something, NOT ad-hoc hacks in generic fsck. */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   68) #define DO_PROGRESS_INDICATOR 0
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000   69) 
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   70) /* fsck 1.41.4 (27-Jan-2009) manpage says:
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   71)  * 0   - No errors
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   72)  * 1   - File system errors corrected
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   73)  * 2   - System should be rebooted
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   74)  * 4   - File system errors left uncorrected
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   75)  * 8   - Operational error
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   76)  * 16  - Usage or syntax error
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   77)  * 32  - Fsck canceled by user request
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   78)  * 128 - Shared library error
+0d7e2e7c3e (Denys Vlasenko 2009-11-15 02:36:49 +0100   79)  */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   80) #define EXIT_OK          0
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   81) #define EXIT_NONDESTRUCT 1
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   82) #define EXIT_DESTRUCT    2
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   83) #define EXIT_UNCORRECTED 4
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   84) #define EXIT_ERROR       8
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   85) #define EXIT_USAGE       16
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   86) #define FSCK_CANCELED    32     /* Aborted with a signal or ^C */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   87) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   88) /*
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000   89)  * Internal structure for mount table entries.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   90)  */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   91) struct fs_info {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000   92) 	struct fs_info *next;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   93) 	char	*device;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   94) 	char	*mountpt;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   95) 	char	*type;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   96) 	char	*opts;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   97) 	int	passno;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   98) 	int	flags;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000   99) };
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  100) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  101) #define FLAG_DONE 1
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  102) #define FLAG_PROGRESS 2
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  103) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  104)  * Structure to allow exit codes to be stored
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  105)  */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  106) struct fsck_instance {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  107) 	struct fsck_instance *next;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  108) 	int	pid;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  109) 	int	flags;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  110) #if DO_PROGRESS_INDICATOR
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  111) 	time_t	start_time;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  112) #endif
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  113) 	char	*prog;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  114) 	char	*device;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  115) 	char	*base_device; /* /dev/hda for /dev/hdaN etc */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  116) };
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  117) 
+6ca409e0e4 (Denis Vlasenko 2007-08-12 20:58:27 +0000  118) static const char ignored_types[] ALIGN1 =
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  119) 	"ignore\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  120) 	"iso9660\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  121) 	"nfs\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  122) 	"proc\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  123) 	"sw\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  124) 	"swap\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  125) 	"tmpfs\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  126) 	"devpts\0";
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  127) 
+0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  128) #if 0
+6ca409e0e4 (Denis Vlasenko 2007-08-12 20:58:27 +0000  129) static const char really_wanted[] ALIGN1 =
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  130) 	"minix\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  131) 	"ext2\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  132) 	"ext3\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  133) 	"jfs\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  134) 	"reiserfs\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  135) 	"xiafs\0"
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  136) 	"xfs\0";
+0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  137) #endif
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  138) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  139) #define BASE_MD "/dev/md"
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  140) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  141) struct globals {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  142) 	char **args;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  143) 	int num_args;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  144) 	int verbose;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  145) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  146) #define FS_TYPE_FLAG_NORMAL 0
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  147) #define FS_TYPE_FLAG_OPT    1
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  148) #define FS_TYPE_FLAG_NEGOPT 2
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  149) 	char **fs_type_list;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  150) 	uint8_t *fs_type_flag;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  151) 	smallint fs_type_negated;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  152) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  153) 	smallint noexecute;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  154) 	smallint serialize;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  155) 	smallint skip_root;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  156) 	/* smallint like_mount; */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  157) 	smallint parallel_root;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  158) 	smallint force_all_parallel;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  159) 	smallint kill_sent;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  160) 
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  161) #if DO_PROGRESS_INDICATOR
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  162) 	smallint progress;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  163) 	int progress_fd;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  164) #endif
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  165) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  166) 	int num_running;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  167) 	int max_running;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  168) 	char *fstype;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  169) 	struct fs_info *filesys_info;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  170) 	struct fs_info *filesys_last;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  171) 	struct fsck_instance *instance_list;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  172) } FIX_ALIASING;
+e6a2f4cc5a (Denys Vlasenko 2016-04-21 16:26:30 +0200  173) #define G (*(struct globals*)bb_common_bufsiz1)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  174) #define INIT_G() do { \
+47cfbf32fd (Denys Vlasenko 2016-04-21 18:18:48 +0200  175) 	setup_common_bufsiz(); \
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  176) 	BUILD_BUG_ON(sizeof(G) > COMMON_BUFSIZE); \
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  177) } while (0)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  178) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  179) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  180)  * Return the "base device" given a particular device; this is used to
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  181)  * assure that we only fsck one partition on a particular drive at any
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  182)  * one time.  Otherwise, the disk heads will be seeking all over the
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  183)  * place.  If the base device cannot be determined, return NULL.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  184)  *
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  185)  * The base_device() function returns an allocated string which must
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  186)  * be freed.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  187)  */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  188) #if ENABLE_FEATURE_DEVFS
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  189) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  190)  * Required for the uber-silly devfs /dev/ide/host1/bus2/target3/lun3
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  191)  * pathames.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  192)  */
+987be932ed (Denys Vlasenko 2022-02-06 20:07:12 +0100  193) static const char *const devfs_hier[] ALIGN_PTR = {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  194) 	"host", "bus", "target", "lun", NULL
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  195) };
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  196) #endif
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  197) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  198) static char *base_device(const char *device)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  199) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  200) 	char *str, *cp;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  201) #if ENABLE_FEATURE_DEVFS
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  202) 	const char *const *hier;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  203) 	const char *disk;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  204) 	int len;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  205) #endif
+f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  206) 	str = xstrdup(device);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  207) 
+f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  208) 	/* Skip over "/dev/"; if it's not present, give up */
+f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  209) 	cp = skip_dev_pfx(str);
+f8d8aa1cea (Denys Vlasenko 2010-04-06 18:50:05 +0200  210) 	if (cp == str)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  211) 		goto errout;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  212) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  213) 	/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  214) 	 * For md devices, we treat them all as if they were all
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  215) 	 * on one disk, since we don't know how to parallelize them.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  216) 	 */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  217) 	if (cp[0] == 'm' && cp[1] == 'd') {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  218) 		cp[2] = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  219) 		return str;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  220) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  221) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  222) 	/* Handle DAC 960 devices */
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  223) 	if (is_prefixed_with(cp, "rd/")) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  224) 		cp += 3;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  225) 		if (cp[0] != 'c' || !isdigit(cp[1])
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  226) 		 || cp[2] != 'd' || !isdigit(cp[3]))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  227) 			goto errout;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  228) 		cp[4] = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  229) 		return str;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  230) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  231) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  232) 	/* Now let's handle /dev/hd* and /dev/sd* devices.... */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  233) 	if ((cp[0] == 'h' || cp[0] == 's') && cp[1] == 'd') {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  234) 		cp += 2;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  235) 		/* If there's a single number after /dev/hd, skip it */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  236) 		if (isdigit(*cp))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  237) 			cp++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  238) 		/* What follows must be an alpha char, or give up */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  239) 		if (!isalpha(*cp))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  240) 			goto errout;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  241) 		cp[1] = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  242) 		return str;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  243) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  244) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  245) #if ENABLE_FEATURE_DEVFS
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  246) 	/* Now let's handle devfs (ugh) names */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  247) 	len = 0;
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  248) 	if (is_prefixed_with(cp, "ide/"))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  249) 		len = 4;
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  250) 	if (is_prefixed_with(cp, "scsi/"))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  251) 		len = 5;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  252) 	if (len) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  253) 		cp += len;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  254) 		/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  255) 		 * Now we proceed down the expected devfs hierarchy.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  256) 		 * i.e., .../host1/bus2/target3/lun4/...
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  257) 		 * If we don't find the expected token, followed by
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  258) 		 * some number of digits at each level, abort.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  259) 		 */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  260) 		for (hier = devfs_hier; *hier; hier++) {
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  261) 			cp = is_prefixed_with(cp, *hier);
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  262) 			if (!cp)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  263) 				goto errout;
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  264) 			while (*cp != '/' && *cp != '\0') {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  265) 				if (!isdigit(*cp))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  266) 					goto errout;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  267) 				cp++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  268) 			}
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  269) //FIXME: what if *cp = '\0' now? cp++ moves past it!!!
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  270) 			cp++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  271) 		}
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  272) 		cp[-1] = '\0';
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  273) 		return str;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  274) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  275) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  276) 	/* Now handle devfs /dev/disc or /dev/disk names */
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  277) 	disk = NULL;
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  278) 	if (is_prefixed_with(cp, "discs/"))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  279) 		disk = "disc";
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  280) 	else if (is_prefixed_with(cp, "disks/"))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  281) 		disk = "disk";
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  282) 	if (disk) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  283) 		cp += 6;
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  284) 		cp = is_prefixed_with(cp, disk);
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  285) 		if (!cp)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  286) 			goto errout;
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  287) 		while (*cp != '/' && *cp != '\0') {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  288) 			if (!isdigit(*cp))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  289) 				goto errout;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  290) 			cp++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  291) 		}
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  292) 		*cp = '\0';
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  293) 		return str;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  294) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  295) #endif
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  296)  errout:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  297) 	free(str);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  298) 	return NULL;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  299) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  300) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  301) static void free_instance(struct fsck_instance *p)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  302) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  303) 	free(p->prog);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  304) 	free(p->device);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  305) 	free(p->base_device);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  306) 	free(p);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  307) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  308) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  309) static struct fs_info *create_fs_device(const char *device, const char *mntpnt,
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  310) 					const char *type, const char *opts,
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  311) 					int passno)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  312) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  313) 	struct fs_info *fs;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  314) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  315) 	fs = xzalloc(sizeof(*fs));
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  316) 	fs->device = xstrdup(device);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  317) 	fs->mountpt = xstrdup(mntpnt);
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  318) 	if (strchr(type, ','))
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  319) 		type = (char *)"auto";
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  320) 	fs->type = xstrdup(type);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  321) 	fs->opts = xstrdup(opts ? opts : "");
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  322) 	fs->passno = passno < 0 ? 1 : passno;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  323) 	/*fs->flags = 0; */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  324) 	/*fs->next = NULL; */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  325) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  326) 	if (!G.filesys_info)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  327) 		G.filesys_info = fs;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  328) 	else
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  329) 		G.filesys_last->next = fs;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  330) 	G.filesys_last = fs;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  331) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  332) 	return fs;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  333) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  334) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  335) /* Load the filesystem database from /etc/fstab */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  336) static void load_fs_info(const char *filename)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  337) {
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  338) 	FILE *fstab;
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  339) 	struct mntent mte;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  340) 	char buf[1024];
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  341) 
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  342) 	fstab = setmntent(filename, "r");
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  343) 	if (!fstab) {
+651a2697f7 (Denys Vlasenko 2010-03-23 16:25:17 +0100  344) 		bb_perror_msg("can't read '%s'", filename);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  345) 		return;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  346) 	}
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  347) 
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  348) 	// Loop through entries
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  349) 	while (getmntent_r(fstab, &mte, buf, sizeof(buf))) {
+76b680c7a8 (Denys Vlasenko 2016-03-30 16:04:37 +0200  350) 		//bb_error_msg("CREATE[%s][%s][%s][%s][%d]", mte.mnt_fsname, mte.mnt_dir,
+ea7c9b3366 (Denis Vlasenko 2008-09-25 10:39:10 +0000  351) 		//	mte.mnt_type, mte.mnt_opts,
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  352) 		//	mte.mnt_passno);
+60a9414cad (Denys Vlasenko 2011-05-13 20:57:01 +0200  353) 		create_fs_device(mte.mnt_fsname, mte.mnt_dir,
+ea7c9b3366 (Denis Vlasenko 2008-09-25 10:39:10 +0000  354) 			mte.mnt_type, mte.mnt_opts,
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  355) 			mte.mnt_passno);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  356) 	}
+b9f5d59893 (Denis Vlasenko 2008-08-20 02:38:48 +0000  357) 	endmntent(fstab);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  358) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  359) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  360) /* Lookup filesys in /etc/fstab and return the corresponding entry. */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  361) static struct fs_info *lookup(char *filesys)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  362) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  363) 	struct fs_info *fs;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  364) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  365) 	for (fs = G.filesys_info; fs; fs = fs->next) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  366) 		if (strcmp(filesys, fs->device) == 0
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  367) 		 || (fs->mountpt && strcmp(filesys, fs->mountpt) == 0)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  368) 		)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  369) 			break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  370) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  371) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  372) 	return fs;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  373) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  374) 
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  375) #if DO_PROGRESS_INDICATOR
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  376) static int progress_active(void)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  377) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  378) 	struct fsck_instance *inst;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  379) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  380) 	for (inst = G.instance_list; inst; inst = inst->next) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  381) 		if (inst->flags & FLAG_DONE)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  382) 			continue;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  383) 		if (inst->flags & FLAG_PROGRESS)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  384) 			return 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  385) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  386) 	return 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  387) }
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  388) #endif
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  389) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  390) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  391) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  392)  * Send a signal to all outstanding fsck child processes
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  393)  */
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  394) static void kill_all_if_got_signal(void)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  395) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  396) 	struct fsck_instance *inst;
+0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  397) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  398) 	if (!bb_got_signal || G.kill_sent)
+0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  399) 		return;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  400) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  401) 	for (inst = G.instance_list; inst; inst = inst->next) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  402) 		if (inst->flags & FLAG_DONE)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  403) 			continue;
+0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000  404) 		kill(inst->pid, SIGTERM);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  405) 	}
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  406) 	G.kill_sent = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  407) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  408) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  409) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  410)  * Wait for one child process to exit; when it does, unlink it from
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  411)  * the list of executing child processes, free, and return its exit status.
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  412)  * If there is no exited child, return -1.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  413)  */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  414) static int wait_one(int flags)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  415) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  416) 	int status;
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  417) 	int exitcode;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  418) 	struct fsck_instance *inst, *prev;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  419) 	pid_t pid;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  420) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  421) 	if (!G.instance_list)
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  422) 		return -1;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  423) 	/* if (G.noexecute) { already returned -1; } */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  424) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  425) 	while (1) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  426) 		pid = waitpid(-1, &status, flags);
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  427) 		kill_all_if_got_signal();
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  428) 		if (pid == 0) /* flags == WNOHANG and no children exited */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  429) 			return -1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  430) 		if (pid < 0) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  431) 			if (errno == EINTR)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  432) 				continue;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  433) 			if (errno == ECHILD) { /* paranoia */
+6937487be7 (James Byrne    2019-07-02 11:35:03 +0200  434) 				bb_simple_error_msg("wait: no more children");
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  435) 				return -1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  436) 			}
+6937487be7 (James Byrne    2019-07-02 11:35:03 +0200  437) 			bb_simple_perror_msg("wait");
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  438) 			continue;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  439) 		}
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  440) 		prev = NULL;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  441) 		inst = G.instance_list;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  442) 		do {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  443) 			if (inst->pid == pid)
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  444) 				goto child_died;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  445) 			prev = inst;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  446) 			inst = inst->next;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  447) 		} while (inst);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  448) 	}
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  449)  child_died:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  450) 
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  451) 	exitcode = WEXITSTATUS(status);
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  452) 	if (WIFSIGNALED(status)) {
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  453) 		unsigned sig;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  454) 		sig = WTERMSIG(status);
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  455) 		exitcode = EXIT_UNCORRECTED;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  456) 		if (sig != SIGINT) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  457) 			printf("Warning: %s %s terminated "
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  458) 				"by signal %u\n",
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  459) 				inst->prog, inst->device, sig);
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  460) 			exitcode = EXIT_ERROR;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  461) 		}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  462) 	}
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  463) 
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  464) #if DO_PROGRESS_INDICATOR
+a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000  465) 	if (progress && (inst->flags & FLAG_PROGRESS) && !progress_active()) {
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  466) 		struct fsck_instance *inst2;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  467) 		for (inst2 = G.instance_list; inst2; inst2 = inst2->next) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  468) 			if (inst2->flags & FLAG_DONE)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  469) 				continue;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  470) 			if (strcmp(inst2->type, "ext2") != 0
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  471) 			 && strcmp(inst2->type, "ext3") != 0
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  472) 			) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  473) 				continue;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  474) 			}
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  475) 			/* ext[23], we will send USR1
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  476) 			 * (request to start displaying progress bar)
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  477) 			 *
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  478) 			 * If we've just started the fsck, wait a tiny
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  479) 			 * bit before sending the kill, to give it
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  480) 			 * time to set up the signal handler
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  481) 			 */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  482) 			if (inst2->start_time >= time(NULL) - 1)
+ec16c030bd (Denys Vlasenko 2020-11-29 11:37:34 +0100  483) 				sleep1();
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  484) 			kill(inst2->pid, SIGUSR1);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  485) 			inst2->flags |= FLAG_PROGRESS;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  486) 			break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  487) 		}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  488) 	}
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  489) #endif
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  490) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  491) 	if (prev)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  492) 		prev->next = inst->next;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  493) 	else
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  494) 		G.instance_list = inst->next;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  495) 	if (G.verbose > 1)
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  496) 		printf("Finished with %s (exit status %u)\n",
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  497) 			inst->device, exitcode);
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  498) 	G.num_running--;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  499) 	free_instance(inst);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  500) 
+ccb8e4bc4f (Denys Vlasenko 2018-05-24 15:26:28 +0200  501) 	return exitcode;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  502) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  503) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  504) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  505)  * Wait until all executing child processes have exited; return the
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  506)  * logical OR of all of their exit code values.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  507)  */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  508) #define FLAG_WAIT_ALL           0
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  509) #define FLAG_WAIT_ATLEAST_ONE   WNOHANG
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  510) static int wait_many(int flags)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  511) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  512) 	int exit_status;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  513) 	int global_status = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  514) 	int wait_flags = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  515) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  516) 	while ((exit_status = wait_one(wait_flags)) != -1) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  517) 		global_status |= exit_status;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  518) 		wait_flags |= flags;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  519) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  520) 	return global_status;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  521) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  522) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  523) /*
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  524)  * Execute a particular fsck program, and link it into the list of
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  525)  * child processes we are waiting for.
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  526)  */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  527) static void execute(const char *type, const char *device,
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  528) 		const char *mntpt /*, int interactive */)
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  529) {
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  530) 	int i;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  531) 	struct fsck_instance *inst;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  532) 	pid_t pid;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  533) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  534) 	G.args[0] = xasprintf("fsck.%s", type);
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  535) 
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  536) #if DO_PROGRESS_INDICATOR
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  537) 	if (progress && !progress_active()) {
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  538) 		if (strcmp(type, "ext2") == 0
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  539) 		 || strcmp(type, "ext3") == 0
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  540) 		) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  541) 			G.args[XXX] = xasprintf("-C%d", progress_fd); /* 1 */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  542) 			inst->flags |= FLAG_PROGRESS;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  543) 		}
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  544) 	}
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  545) #endif
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  546) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  547) 	G.args[G.num_args - 2] = (char*)device;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  548) 	/* G.args[G.num_args - 1] = NULL; - already is */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  549) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  550) 	if (G.verbose || G.noexecute) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  551) 		printf("[%s (%d) -- %s]", G.args[0], G.num_running,
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  552) 					mntpt ? mntpt : device);
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  553) 		for (i = 0; G.args[i]; i++)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  554) 			printf(" %s", G.args[i]);
+4daad9004d (Denis Vlasenko 2007-09-27 10:20:47 +0000  555) 		bb_putchar('\n');
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  556) 	}
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  557) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  558) 	/* Fork and execute the correct program. */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  559) 	pid = -1;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  560) 	if (!G.noexecute) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  561) 		pid = spawn(G.args);
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  562) 		if (pid < 0)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  563) 			bb_simple_perror_msg(G.args[0]);
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  564) 	}
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  565) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  566) #if DO_PROGRESS_INDICATOR
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  567) 	free(G.args[XXX]);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  568) #endif
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  569) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  570) 	/* No child, so don't record an instance */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  571) 	if (pid <= 0) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  572) 		free(G.args[0]);
+30eb319103 (Denis Vlasenko 2008-02-02 18:54:58 +0000  573) 		return;
+30eb319103 (Denis Vlasenko 2008-02-02 18:54:58 +0000  574) 	}
+30eb319103 (Denis Vlasenko 2008-02-02 18:54:58 +0000  575) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  576) 	inst = xzalloc(sizeof(*inst));
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  577) 	inst->pid = pid;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  578) 	inst->prog = G.args[0];
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  579) 	inst->device = xstrdup(device);
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  580) 	inst->base_device = base_device(device);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  581) #if DO_PROGRESS_INDICATOR
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  582) 	inst->start_time = time(NULL);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  583) #endif
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  584) 
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  585) 	/* Add to the list of running fsck's.
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  586) 	 * (was adding to the end, but adding to the front is simpler...) */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  587) 	inst->next = G.instance_list;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  588) 	G.instance_list = inst;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  589) }
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  590) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  591) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  592)  * Run the fsck program on a particular device
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  593)  *
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  594)  * If the type is specified using -t, and it isn't prefixed with "no"
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  595)  * (as in "noext2") and only one filesystem type is specified, then
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  596)  * use that type regardless of what is specified in /etc/fstab.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  597)  *
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  598)  * If the type isn't specified by the user, then use either the type
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  599)  * specified in /etc/fstab, or "auto".
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  600)  */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  601) static void fsck_device(struct fs_info *fs /*, int interactive */)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  602) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  603) 	const char *type;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  604) 
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  605) 	if (strcmp(fs->type, "auto") != 0) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  606) 		type = fs->type;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  607) 		if (G.verbose > 2)
+c418f48d8d (Denys Vlasenko 2016-03-30 16:30:24 +0200  608) 			printf("using filesystem type '%s' %s\n",
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  609) 					type, "from fstab");
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  610) 	} else if (G.fstype
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  611) 	 && (G.fstype[0] != 'n' || G.fstype[1] != 'o') /* != "no" */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  612) 	 && !is_prefixed_with(G.fstype, "opts=")
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  613) 	 && !is_prefixed_with(G.fstype, "loop")
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  614) 	 && !strchr(G.fstype, ',')
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  615) 	) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  616) 		type = G.fstype;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  617) 		if (G.verbose > 2)
+c418f48d8d (Denys Vlasenko 2016-03-30 16:30:24 +0200  618) 			printf("using filesystem type '%s' %s\n",
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  619) 					type, "from -t");
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  620) 	} else {
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  621) 		type = "auto";
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  622) 		if (G.verbose > 2)
+c418f48d8d (Denys Vlasenko 2016-03-30 16:30:24 +0200  623) 			printf("using filesystem type '%s' %s\n",
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  624) 					type, "(default)");
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  625) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  626) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  627) 	G.num_running++;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  628) 	execute(type, fs->device, fs->mountpt /*, interactive */);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  629) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  630) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  631) /*
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  632)  * Returns TRUE if a partition on the same disk is already being
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  633)  * checked.
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  634)  */
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  635) static int device_already_active(char *device)
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  636) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  637) 	struct fsck_instance *inst;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  638) 	char *base;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  639) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  640) 	if (G.force_all_parallel)
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  641) 		return 0;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  642) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  643) #ifdef BASE_MD
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  644) 	/* Don't check a soft raid disk with any other disk */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  645) 	if (G.instance_list
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  646) 	 && (is_prefixed_with(G.instance_list->device, BASE_MD)
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  647) 	     || is_prefixed_with(device, BASE_MD))
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  648) 	) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  649) 		return 1;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  650) 	}
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  651) #endif
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  652) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  653) 	base = base_device(device);
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  654) 	/*
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  655) 	 * If we don't know the base device, assume that the device is
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  656) 	 * already active if there are any fsck instances running.
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  657) 	 */
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  658) 	if (!base)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  659) 		return (G.instance_list != NULL);
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  660) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  661) 	for (inst = G.instance_list; inst; inst = inst->next) {
+1d3a04a3a4 (Denys Vlasenko 2016-11-28 01:22:57 +0100  662) 		if (!inst->base_device || strcmp(base, inst->base_device) == 0) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  663) 			free(base);
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  664) 			return 1;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  665) 		}
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  666) 	}
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  667) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  668) 	free(base);
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  669) 	return 0;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  670) }
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  671) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  672) /*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  673)  * This function returns true if a particular option appears in a
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  674)  * comma-delimited options list
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  675)  */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  676) static int opt_in_list(char *opt, char *optlist)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  677) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  678) 	char *s;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  679) 	int len;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  680) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  681) 	if (!optlist)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  682) 		return 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  683) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  684) 	len = strlen(opt);
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  685) 	s = optlist - 1;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  686) 	while (1) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  687) 		s = strstr(s + 1, opt);
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  688) 		if (!s)
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  689) 			return 0;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  690) 		/* neither "opt.." nor "xxx,opt.."? */
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  691) 		if (s != optlist && s[-1] != ',')
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  692) 			continue;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  693) 		/* neither "..opt" nor "..opt,xxx"? */
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  694) 		if (s[len] != '\0' && s[len] != ',')
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  695) 			continue;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  696) 		return 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  697) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  698) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  699) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  700) /* See if the filesystem matches the criteria given by the -t option */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  701) static int fs_match(struct fs_info *fs)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  702) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  703) 	int n, ret, checked_type;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  704) 	char *cp;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  705) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  706) 	if (!G.fs_type_list)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  707) 		return 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  708) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  709) 	ret = 0;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  710) 	checked_type = 0;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  711) 	n = 0;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  712) 	while (1) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  713) 		cp = G.fs_type_list[n];
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  714) 		if (!cp)
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  715) 			break;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  716) 		switch (G.fs_type_flag[n]) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  717) 		case FS_TYPE_FLAG_NORMAL:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  718) 			checked_type++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  719) 			if (strcmp(cp, fs->type) == 0)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  720) 				ret = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  721) 			break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  722) 		case FS_TYPE_FLAG_NEGOPT:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  723) 			if (opt_in_list(cp, fs->opts))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  724) 				return 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  725) 			break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  726) 		case FS_TYPE_FLAG_OPT:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  727) 			if (!opt_in_list(cp, fs->opts))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  728) 				return 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  729) 			break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  730) 		}
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  731) 		n++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  732) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  733) 	if (checked_type == 0)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  734) 		return 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  735) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  736) 	return (G.fs_type_negated ? !ret : ret);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  737) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  738) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  739) /* Check if we should ignore this filesystem. */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  740) static int ignore(struct fs_info *fs)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  741) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  742) 	/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  743) 	 * If the pass number is 0, ignore it.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  744) 	 */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  745) 	if (fs->passno == 0)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  746) 		return 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  747) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  748) 	/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  749) 	 * If a specific fstype is specified, and it doesn't match,
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  750) 	 * ignore it.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  751) 	 */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  752) 	if (!fs_match(fs))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  753) 		return 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  754) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  755) 	/* Are we ignoring this type? */
+990d0f63ee (Denis Vlasenko 2007-07-24 15:54:42 +0000  756) 	if (index_in_strings(ignored_types, fs->type) >= 0)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  757) 		return 1;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  758) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  759) 	/* We can and want to check this file system type. */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  760) 	return 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  761) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  762) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  763) /* Check all file systems, using the /etc/fstab table. */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  764) static int check_all(void)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  765) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  766) 	struct fs_info *fs;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  767) 	int status = EXIT_OK;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  768) 	smallint not_done_yet;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  769) 	smallint pass_done;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  770) 	int passno;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  771) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  772) 	if (G.verbose)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  773) 		puts("Checking all filesystems");
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  774) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  775) 	/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  776) 	 * Do an initial scan over the filesystem; mark filesystems
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  777) 	 * which should be ignored as done, and resolve any "auto"
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  778) 	 * filesystem types (done as a side-effect of calling ignore()).
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  779) 	 */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  780) 	for (fs = G.filesys_info; fs; fs = fs->next)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  781) 		if (ignore(fs))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  782) 			fs->flags |= FLAG_DONE;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  783) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  784) 	/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  785) 	 * Find and check the root filesystem.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  786) 	 */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  787) 	if (!G.parallel_root) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  788) 		for (fs = G.filesys_info; fs; fs = fs->next) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  789) 			if (LONE_CHAR(fs->mountpt, '/')) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  790) 				if (!G.skip_root && !ignore(fs)) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  791) 					fsck_device(fs /*, 1*/);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  792) 					status |= wait_many(FLAG_WAIT_ALL);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  793) 					if (status > EXIT_NONDESTRUCT)
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  794) 						return status;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  795) 				}
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  796) 				fs->flags |= FLAG_DONE;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  797) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  798) 			}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  799) 		}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  800) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  801) 	/*
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  802) 	 * This is for the bone-headed user who has root
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  803) 	 * filesystem listed twice.
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  804) 	 * "Skip root" will skip _all_ root entries.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  805) 	 */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  806) 	if (G.skip_root)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  807) 		for (fs = G.filesys_info; fs; fs = fs->next)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  808) 			if (LONE_CHAR(fs->mountpt, '/'))
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  809) 				fs->flags |= FLAG_DONE;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  810) 
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  811) 	not_done_yet = 1;
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  812) 	passno = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  813) 	while (not_done_yet) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  814) 		not_done_yet = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  815) 		pass_done = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  816) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  817) 		for (fs = G.filesys_info; fs; fs = fs->next) {
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  818) 			if (bb_got_signal)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  819) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  820) 			if (fs->flags & FLAG_DONE)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  821) 				continue;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  822) 			/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  823) 			 * If the filesystem's pass number is higher
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  824) 			 * than the current pass number, then we didn't
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  825) 			 * do it yet.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  826) 			 */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  827) 			if (fs->passno > passno) {
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  828) 				not_done_yet = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  829) 				continue;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  830) 			}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  831) 			/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  832) 			 * If a filesystem on a particular device has
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  833) 			 * already been spawned, then we need to defer
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  834) 			 * this to another pass.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  835) 			 */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  836) 			if (device_already_active(fs->device)) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  837) 				pass_done = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  838) 				continue;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  839) 			}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  840) 			/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  841) 			 * Spawn off the fsck process
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  842) 			 */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  843) 			fsck_device(fs /*, G.serialize*/);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  844) 			fs->flags |= FLAG_DONE;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  845) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  846) 			/*
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  847) 			 * Only do one filesystem at a time, or if we
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  848) 			 * have a limit on the number of fsck's extant
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  849) 			 * at one time, apply that limit.
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  850) 			 */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  851) 			if (G.serialize
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  852) 			 || (G.num_running >= G.max_running)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  853) 			) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  854) 				pass_done = 0;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  855) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  856) 			}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  857) 		}
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  858) 		if (bb_got_signal)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  859) 			break;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  860) 		if (G.verbose > 1)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  861) 			printf("--waiting-- (pass %d)\n", passno);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  862) 		status |= wait_many(pass_done ? FLAG_WAIT_ALL :
+6967578728 (Denys Vlasenko 2013-01-14 01:34:48 +0100  863) 				FLAG_WAIT_ATLEAST_ONE);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  864) 		if (pass_done) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  865) 			if (G.verbose > 1)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  866) 				puts("----------------------------------");
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  867) 			passno++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  868) 		} else
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  869) 			not_done_yet = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  870) 	}
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  871) 	kill_all_if_got_signal();
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  872) 	status |= wait_many(FLAG_WAIT_ATLEAST_ONE);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  873) 	return status;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  874) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  875) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  876) /*
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  877)  * Deal with the fsck -t argument.
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  878)  * Huh, for mount "-t novfat,nfs" means "neither vfat nor nfs"!
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  879)  * Why here we require "-t novfat,nonfs" ??
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  880)  */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  881) static void compile_fs_type(char *fs_type)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  882) {
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  883) 	char *s;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  884) 	int num = 2;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  885) 	smallint negate;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  886) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  887) 	s = fs_type;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  888) 	while ((s = strchr(s, ','))) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  889) 		num++;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  890) 		s++;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  891) 	}
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  892) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  893) 	G.fs_type_list = xzalloc(num * sizeof(G.fs_type_list[0]));
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  894) 	G.fs_type_flag = xzalloc(num * sizeof(G.fs_type_flag[0]));
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  895) 	G.fs_type_negated = -1; /* not yet known is it negated or not */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  896) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  897) 	num = 0;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  898) 	s = fs_type;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  899) 	while (1) {
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  900) 		char *comma;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  901) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  902) 		negate = 0;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  903) 		if (s[0] == 'n' && s[1] == 'o') { /* "no.." */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  904) 			s += 2;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  905) 			negate = 1;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  906) 		} else if (s[0] == '!') {
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  907) 			s++;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  908) 			negate = 1;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  909) 		}
+e18a293a52 (Denis Vlasenko 2007-01-19 02:03:14 +0000  910) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  911) 		if (strcmp(s, "loop") == 0)
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  912) 			/* loop is really short-hand for opts=loop */
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  913) 			goto loop_special_case;
+8dff01d06a (Denys Vlasenko 2015-03-12 17:48:34 +0100  914) 		if (is_prefixed_with(s, "opts=")) {
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  915) 			s += 5;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  916)  loop_special_case:
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  917) 			G.fs_type_flag[num] = negate ? FS_TYPE_FLAG_NEGOPT : FS_TYPE_FLAG_OPT;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  918) 		} else {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  919) 			if (G.fs_type_negated == -1)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  920) 				G.fs_type_negated = negate;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  921) 			if (G.fs_type_negated != negate)
+6937487be7 (James Byrne    2019-07-02 11:35:03 +0200  922) 				bb_simple_error_msg_and_die(
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  923) "either all or none of the filesystem types passed to -t must be prefixed "
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  924) "with 'no' or '!'");
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  925) 		}
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  926) 		comma = strchrnul(s, ',');
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  927) 		G.fs_type_list[num++] = xstrndup(s, comma-s);
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  928) 		if (*comma == '\0')
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  929) 			break;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  930) 		s = comma + 1;
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  931) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  932) }
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  933) 
+7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  934) static char **new_args(void)
+7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  935) {
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  936) 	G.args = xrealloc_vector(G.args, 2, G.num_args);
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  937) 	return &G.args[G.num_args++];
+7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  938) }
+7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  939) 
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  940) int fsck_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  941) int fsck_main(int argc UNUSED_PARAM, char **argv)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  942) {
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  943) 	int i, status;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  944) 	/*int interactive;*/
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  945) 	struct fs_info *fs;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  946) 	const char *fstab;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  947) 	char *tmp;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  948) 	char **devices;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  949) 	int num_devices;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  950) 	smallint opts_for_fsck;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  951) 	smallint doall;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  952) 	smallint notitle;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  953) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  954) 	INIT_G();
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  955) 
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  956) 	/* we want wait() to be interruptible */
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  957) 	signal_no_SA_RESTART_empty_mask(SIGINT, record_signo);
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  958) 	signal_no_SA_RESTART_empty_mask(SIGTERM, record_signo);
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  959) 
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  960) 	setbuf(stdout, NULL);
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  961) 
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  962) 	opts_for_fsck = doall = notitle = 0;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  963) 	devices = NULL;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  964) 	num_devices = 0;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  965) 	new_args(); /* G.args[0] = NULL, will be replaced by fsck.<type> */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200  966) 	/* G.instance_list = NULL; - in bss, so already zeroed */
+7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  967) 
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  968) 	while (*++argv) {
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  969) 		int j;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  970) 		int optpos;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  971) 		char *options;
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  972) 		char *arg = *argv;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  973) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  974) 		/* "/dev/blk" or "/path" or "UUID=xxx" or "LABEL=xxx" */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  975) 		if ((arg[0] == '/' && !opts_for_fsck) || strchr(arg, '=')) {
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  976) // FIXME: must check that arg is a blkdev, or resolve
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000  977) // "/path", "UUID=xxx" or "LABEL=xxx" into block device name
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  978) // ("UUID=xxx"/"LABEL=xxx" can probably shifted to fsck.auto duties)
+deeed59de0 (Denis Vlasenko 2008-07-08 05:14:36 +0000  979) 			devices = xrealloc_vector(devices, 2, num_devices);
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200  980) 			devices[num_devices++] = arg;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  981) 			continue;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  982) 		}
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  983) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  984) 		if (arg[0] != '-' || opts_for_fsck) {
+7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200  985) 			*new_args() = arg;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  986) 			continue;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  987) 		}
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000  988) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  989) 		if (LONE_CHAR(arg + 1, '-')) { /* "--" ? */
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  990) 			opts_for_fsck = 1;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  991) 			continue;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  992) 		}
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  993) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  994) 		optpos = 0;
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000  995) 		options = NULL;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  996) 		for (j = 1; arg[j]; j++) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  997) 			switch (arg[j]) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000  998) 			case 'A':
+a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000  999) 				doall = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1000) 				break;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1001) #if DO_PROGRESS_INDICATOR
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1002) 			case 'C':
+a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1003) 				progress = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1004) 				if (arg[++j]) { /* -Cn */
+7783248eaa (Denys Vlasenko 2010-08-12 14:14:45 +0200 1005) 					progress_fd = xatoi_positive(&arg[j]);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1006) 					goto next_arg;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1007) 				}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1008) 				/* -C n */
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1009) 				if (!*++argv)
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1010) 					bb_show_usage();
+7783248eaa (Denys Vlasenko 2010-08-12 14:14:45 +0200 1011) 				progress_fd = xatoi_positive(*argv);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1012) 				goto next_arg;
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1013) #endif
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1014) 			case 'V':
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1015) 				G.verbose++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1016) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1017) 			case 'N':
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1018) 				G.noexecute = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1019) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1020) 			case 'R':
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1021) 				G.skip_root = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1022) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1023) 			case 'T':
+a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1024) 				notitle = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1025) 				break;
+a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1026) /*			case 'M':
+a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1027) 				like_mount = 1;
+a0e701d137 (Denis Vlasenko 2007-01-19 02:01:19 +0000 1028) 				break; */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1029) 			case 'P':
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1030) 				G.parallel_root = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1031) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1032) 			case 's':
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1033) 				G.serialize = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1034) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1035) 			case 't':
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1036) 				if (G.fstype)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1037) 					bb_show_usage();
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1038) 				if (arg[++j])
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1039) 					tmp = &arg[j];
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1040) 				else if (*++argv)
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1041) 					tmp = *argv;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1042) 				else
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1043) 					bb_show_usage();
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1044) 				G.fstype = xstrdup(tmp);
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1045) 				compile_fs_type(G.fstype);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1046) 				goto next_arg;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1047) 			case '?':
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1048) 				bb_show_usage();
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1049) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1050) 			default:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1051) 				optpos++;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1052) 				/* one extra for '\0' */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1053) 				options = xrealloc(options, optpos + 2);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1054) 				options[optpos] = arg[j];
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1055) 				break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1056) 			}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1057) 		}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1058)  next_arg:
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1059) 		if (optpos) {
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1060) 			options[0] = '-';
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1061) 			options[optpos + 1] = '\0';
+7649bd024c (Denys Vlasenko 2009-09-13 05:52:46 +0200 1062) 			*new_args() = options;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1063) 		}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1064) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1065) 	if (getenv("FSCK_FORCE_ALL_PARALLEL"))
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1066) 		G.force_all_parallel = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1067) 	tmp = getenv("FSCK_MAX_INST");
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1068) 	G.max_running = INT_MAX;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1069) 	if (tmp)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1070) 		G.max_running = xatoi(tmp);
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1071) 	new_args(); /* G.args[G.num_args - 2] will be replaced by <device> */
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1072) 	new_args(); /* G.args[G.num_args - 1] is the last, NULL element */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1073) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1074) 	if (!notitle)
+eba7fe6bb9 (Denys Vlasenko 2017-01-29 19:14:26 +0100 1075) 		puts("fsck (busybox "BB_VER")");
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1076) 
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000 1077) 	/* Even plain "fsck /dev/hda1" needs fstab to get fs type,
+1abf91aa25 (Denis Vlasenko 2007-01-19 02:02:33 +0000 1078) 	 * so we are scanning it anyway */
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1079) 	fstab = getenv("FSTAB_FILE");
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1080) 	if (!fstab)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1081) 		fstab = "/etc/fstab";
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1082) 	load_fs_info(fstab);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1083) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1084) 	/*interactive = (num_devices == 1) | G.serialize;*/
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1085) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1086) 	if (num_devices == 0)
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1087) 		/*interactive =*/ G.serialize = doall = 1;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1088) 	if (doall)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1089) 		return check_all();
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1090) 
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1091) 	status = 0;
+0de9375ee6 (Denis Vlasenko 2006-12-26 02:51:29 +0000 1092) 	for (i = 0; i < num_devices; i++) {
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1093) 		if (bb_got_signal) {
+6683745bf7 (Denys Vlasenko 2009-09-13 05:52:03 +0200 1094) 			kill_all_if_got_signal();
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1095) 			break;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1096) 		}
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1097) 
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1098) 		fs = lookup(devices[i]);
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1099) 		if (!fs)
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1100) 			fs = create_fs_device(devices[i], "", "auto", NULL, -1);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1101) 		fsck_device(fs /*, interactive */);
+f8c11aa65d (Denis Vlasenko 2007-01-19 02:04:09 +0000 1102) 
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1103) 		if (G.serialize
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1104) 		 || (G.num_running >= G.max_running)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1105) 		) {
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1106) 			int exit_status = wait_one(0);
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1107) 			if (exit_status >= 0)
+a55bd05f3c (Denis Vlasenko 2008-03-17 08:59:19 +0000 1108) 				status |= exit_status;
+c4fb8c6ad5 (Denys Vlasenko 2015-10-19 02:24:14 +0200 1109) 			if (G.verbose > 1)
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1110) 				puts("----------------------------------");
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1111) 		}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1112) 	}
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1113) 	status |= wait_many(FLAG_WAIT_ALL);
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1114) 	return status;
+c4f623ef2a (Denis Vlasenko 2006-12-26 01:30:59 +0000 1115) }
