@@ -1,5 +1,5 @@
 #!/bin/sh
 
-grep -rn "#ifdef" busybox > ifdef_found.txt
+grep -rn "#ifdef" tooltest > ifdef_found.txt
 
 

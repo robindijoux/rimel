@@ -112,27 +112,38 @@ def isFile(file):
         return True           
 
 def extractCommitsInfo(): 
-   #subprocess.run(["find-ifdef.sh", ""], shell= True)
+   subprocess.run(["find-ifdef.sh", ""], shell= True)
    contributors = []
    splitedFilesAndDirs = splitDirectoryFromFile()
-   print(os.getcwd())
-   cmd = 'cd tooltest/fahde & git blame one.c > C:/Users/user/Documents/GitHub/rimel/ifdef.txt'
-   os.popen(cmd) 
-   subprocess.run(["retrieve-info.sh"] , shell=True)
-   extractAllContributors(contributors)
-#    for dirAndFile in splitedFilesAndDirs:
-#         if(isFile(dirAndFile[1]) == True and isPackExtension(dirAndFile[1]) == False):
-#             cmd = createCommand(dirAndFile[0] , dirAndFile[1])
-#             print(cmd)
-#             print(dirAndFile[0] + "/" + dirAndFile[1])
-#             print("##########################################")
-#             os.popen(cmd)
-#             time.sleep(2) 
-#             subprocess.run(["retrieve-info.sh"] , shell=True)
-#             extractAllContributors(contributors)
-#         else:
-#             continue    
+   
+#    cmd = 'cd busybox/networking &git blame interface.c > C:/Users/user/Documents/GitHub/rimel/ifdef.txt'
+#    os.popen(cmd) 
+#    subprocess.run(["retrieve-info.sh"] , shell=True)
+#    extractAllContributors(contributors)
+   for dirAndFile in splitedFilesAndDirs:
+        if(isFile(dirAndFile[1]) == True and isPackExtension(dirAndFile[1]) == False):
+            cmd = createCommand(dirAndFile[0] , dirAndFile[1])
+            print(dirAndFile[0] + "/" + dirAndFile[1])
+            print("##########################################")
+            os.popen(cmd)
+            os.popen("cd ~")
+            os.popen("grep '#ifdef' ifdef.txt > test.txt")
+            extractAllContributors(contributors)
+        else:
+            continue    
    findPaternityOwner(contributors)
+
+
+def run_command(command):
+    process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE)
+    while True:
+        output = process.stdout.readline()
+        if output == '' and process.poll() is not None:
+            break
+        if output:
+            print(output.strip())
+    rc = process.poll()
+    return rc
 
 
     
@@ -153,17 +164,4 @@ extractCommitsInfo()
 
 #print(splitDirectoryFromFile())
 
-
-
-def run_command(command):
-    process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, shell=True)
-    while True:
-        output = process.stdout.readline()
-        if output == '' and process.poll() is not None:
-            break
-        if output:
-            print(output.strip())
-    rc = process.poll()
-    return rc
-
-# run_command("ls")    
+#run_command("ls")
