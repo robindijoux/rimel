@@ -25,8 +25,7 @@ def fileMatcher(file):
      
 
 
-def extractAllContributors():
-    contributors = []
+def extractAllContributors(contributors):
     try:
         with open('test.txt', 'r') as f:
             for line in f:
@@ -34,16 +33,15 @@ def extractAllContributors():
                 if fileMatcher(x[1]):
                    name = x[2]
                    if contributerMatcher(x[3]):
-                        contributors.append(name[1:])
+                        contributors.append((x[len(x) - 1],name[1:]))
                    else:
-                        contributors.append(name[1:] + " " + x[3]) 
+                        contributors.append((x[len(x) - 1],name[1:] + " " + x[3])) 
                 else:  
                     name = x[1]
                     if contributerMatcher(x[2]):
-                        contributors.append(name[1:])
+                        contributors.append((x[len(x) - 1],name[1:]))
                     else:
-                        contributors.append(name[1:] + " " + x[2]) 
-            print(len(contributors))                         
+                        contributors.append((x[len(x) - 1],name[1:] + " " + x[2]))           
             return contributors    
     except Exception as e:
         print(e)
@@ -51,20 +49,20 @@ def extractAllContributors():
 
 def findPaternityOwner(contributors):
     dict = set()
-    for name in contributors:
-      dict.add((name,occurence(contributors,name)))
+    for featureContributor in contributors:
+      dict.add((featureContributor[0], featureContributor[1], occurence(contributors,featureContributor[1], featureContributor[0])))
     determinePaternity(dict)
 
-def occurence(liste, element):
+def occurence(liste, element, feature):
     count = 0
     for i in liste:
-        if i == element:
+        if (i[1] == element and i[0] == feature ):
             count += 1
     return count
 
 
 def determinePaternity(contributors): 
-    x = sorted(list(contributors),key=lambda x: -x[1])
+    x = sorted(list(contributors),key=lambda x: -x[2])
     print(x)
 
 
@@ -113,7 +111,7 @@ def isFile(file):
         return True           
 
 def extractCommitsInfo(): 
-   #subprocess.run(["find-ifdef.sh", ""], shell= True)
+   subprocess.run(["find-ifdef.sh", ""], shell= True)
    contributors = []
    splitedFilesAndDirs = splitDirectoryFromFile()
    print(os.getcwd())
@@ -128,7 +126,7 @@ def extractCommitsInfo():
             print(dirAndFile[0] + "/" + dirAndFile[1])
             print("##########################################")
             os.popen(cmd)
-            #time.sleep(2) 
+            time.sleep(2) 
             subprocess.run(["retrieve-info.sh"] , shell=True)
             extractAllContributors(contributors)
         else:
@@ -138,24 +136,21 @@ def extractCommitsInfo():
 
     
     
-#extractCommitsInfo()
+extractCommitsInfo()
 
 #splitDirectoryFromFile()
 
 #print(createCommand("busybox/archival/" , "gzip.c"))
 
-extractAllContributors()
+#print(extractAllContributors())
 
 #print(fileMatcher("etworking/interface.c"))
 
 #extractIfDefFiles()
 
-#print(isFile("fahd") == True and isPackExtension("fahd.c") == False)
 
 #print(splitDirectoryFromFile())
 
 
 
- 
-
-
+  

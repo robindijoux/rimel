@@ -1,0 +1,177 @@
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   1) /*
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   2)  *  dialog.h -- common declarations for all dialog modules
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   3)  *
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   4)  *  AUTHOR: Savio Lam (lam836@cs.cuhk.hk)
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   5)  *
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   6)  *  This program is free software; you can redistribute it and/or
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   7)  *  modify it under the terms of the GNU General Public License
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   8)  *  as published by the Free Software Foundation; either version 2
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   9)  *  of the License, or (at your option) any later version.
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  10)  *
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  11)  *  This program is distributed in the hope that it will be useful,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  12)  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  13)  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  14)  *  GNU General Public License for more details.
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  15)  *
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  16)  *  You should have received a copy of the GNU General Public License
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  17)  *  along with this program; if not, write to the Free Software
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  18)  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  19)  */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  20) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  21) #include <sys/types.h>
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  22) #include <fcntl.h>
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  23) #include <unistd.h>
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  24) #include <ctype.h>
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  25) #include <stdlib.h>
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  26) #include <string.h>
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  27) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  28) #ifdef __sun__
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  29) #define CURS_MACROS
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  30) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  31) #include CURSES_LOC
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  32) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  33) /*
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  34)  * Colors in ncurses 1.9.9e do not work properly since foreground and
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  35)  * background colors are OR'd rather than separately masked.  This version
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  36)  * of dialog was hacked to work with ncurses 1.9.9e, making it incompatible
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  37)  * with standard curses.  The simplest fix (to make this work with standard
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  38)  * curses) uses the wbkgdset() function, not used in the original hack.
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  39)  * Turn it off if we're building with 1.9.9e, since it just confuses things.
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  40)  */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  41) #if defined(NCURSES_VERSION) && defined(_NEED_WRAP) && !defined(GCC_PRINTFLIKE)
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  42) #define OLD_NCURSES 1
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  43) #undef  wbkgdset
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  44) #define wbkgdset(w,p)		/*nothing */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  45) #else
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  46) #define OLD_NCURSES 0
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  47) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  48) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  49) #define TR(params) _tracef params
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  50) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  51) #define ESC 27
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  52) #define TAB 9
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  53) #define MAX_LEN 2048
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  54) #define BUF_SIZE (10*1024)
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  55) #define MIN(x,y) (x < y ? x : y)
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  56) #define MAX(x,y) (x > y ? x : y)
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  57) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  58) #ifndef ACS_ULCORNER
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  59) #define ACS_ULCORNER '+'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  60) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  61) #ifndef ACS_LLCORNER
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  62) #define ACS_LLCORNER '+'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  63) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  64) #ifndef ACS_URCORNER
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  65) #define ACS_URCORNER '+'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  66) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  67) #ifndef ACS_LRCORNER
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  68) #define ACS_LRCORNER '+'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  69) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  70) #ifndef ACS_HLINE
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  71) #define ACS_HLINE '-'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  72) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  73) #ifndef ACS_VLINE
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  74) #define ACS_VLINE '|'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  75) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  76) #ifndef ACS_LTEE
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  77) #define ACS_LTEE '+'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  78) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  79) #ifndef ACS_RTEE
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  80) #define ACS_RTEE '+'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  81) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  82) #ifndef ACS_UARROW
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  83) #define ACS_UARROW '^'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  84) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  85) #ifndef ACS_DARROW
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  86) #define ACS_DARROW 'v'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  87) #endif
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  88) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  89) /*
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  90)  * Attribute names
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  91)  */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  92) #define screen_attr                   attributes[0]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  93) #define shadow_attr                   attributes[1]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  94) #define dialog_attr                   attributes[2]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  95) #define title_attr                    attributes[3]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  96) #define border_attr                   attributes[4]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  97) #define button_active_attr            attributes[5]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  98) #define button_inactive_attr          attributes[6]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  99) #define button_key_active_attr        attributes[7]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 100) #define button_key_inactive_attr      attributes[8]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 101) #define button_label_active_attr      attributes[9]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 102) #define button_label_inactive_attr    attributes[10]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 103) #define inputbox_attr                 attributes[11]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 104) #define inputbox_border_attr          attributes[12]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 105) #define searchbox_attr                attributes[13]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 106) #define searchbox_title_attr          attributes[14]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 107) #define searchbox_border_attr         attributes[15]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 108) #define position_indicator_attr       attributes[16]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 109) #define menubox_attr                  attributes[17]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 110) #define menubox_border_attr           attributes[18]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 111) #define item_attr                     attributes[19]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 112) #define item_selected_attr            attributes[20]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 113) #define tag_attr                      attributes[21]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 114) #define tag_selected_attr             attributes[22]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 115) #define tag_key_attr                  attributes[23]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 116) #define tag_key_selected_attr         attributes[24]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 117) #define check_attr                    attributes[25]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 118) #define check_selected_attr           attributes[26]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 119) #define uarrow_attr                   attributes[27]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 120) #define darrow_attr                   attributes[28]
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 121) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 122) /* number of attributes */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 123) #define ATTRIBUTE_COUNT               29
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 124) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 125) /*
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 126)  * Global variables
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 127)  */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 128) extern bool use_colors;
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 129) extern bool use_shadow;
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 130) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 131) extern chtype attributes[];
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 132) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 133) extern const char *backtitle;
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 134) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 135) /*
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 136)  * Function prototypes
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 137)  */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 138) extern void create_rc(const char *filename);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 139) extern int parse_rc(void);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 140) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 141) void init_dialog(void);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 142) void end_dialog(void);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 143) void attr_clear(WINDOW * win, int height, int width, chtype attr);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 144) void dialog_clear(void);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 145) void color_setup(void);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 146) void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 147) void print_button(WINDOW * win, const char *label, int y, int x, int selected);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 148) void print_title(WINDOW *dialog, const char *title, int width);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 149) void draw_box(WINDOW * win, int y, int x, int height, int width, chtype box,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 150) 	      chtype border);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 151) void draw_shadow(WINDOW * win, int y, int x, int height, int width);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 152) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 153) int first_alpha(const char *string, const char *exempt);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 154) int dialog_yesno(const char *title, const char *prompt, int height, int width);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 155) int dialog_msgbox(const char *title, const char *prompt, int height,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 156) 		  int width, int pause);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 157) int dialog_textbox(const char *title, const char *file, int height, int width);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 158) int dialog_menu(const char *title, const char *prompt, int height, int width,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 159) 		int menu_height, const char *choice, int item_no,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 160) 		const char *const *items);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 161) int dialog_checklist(const char *title, const char *prompt, int height,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 162) 		     int width, int list_height, int item_no,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 163) 		     const char *const *items);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 164) extern char dialog_input_result[];
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 165) int dialog_inputbox(const char *title, const char *prompt, int height,
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 166) 		    int width, const char *init);
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 167) 
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 168) /*
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 169)  * This is the base for fictitious keys, which activate
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 170)  * the buttons.
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 171)  *
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 172)  * Mouse-generated keys are the following:
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 173)  *   -- the first 32 are used as numbers, in addition to '0'-'9'
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 174)  *   -- the lowercase are used to signal mouse-enter events (M_EVENT + 'o')
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 175)  *   -- uppercase chars are used to invoke the button (M_EVENT + 'O')
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 176)  */
+7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 177) #define M_EVENT (KEY_MAX+1)
