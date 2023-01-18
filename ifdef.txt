@@ -1,177 +1,1592 @@
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   1) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   2)  *  dialog.h -- common declarations for all dialog modules
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   3)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   4)  *  AUTHOR: Savio Lam (lam836@cs.cuhk.hk)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   5)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   6)  *  This program is free software; you can redistribute it and/or
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   7)  *  modify it under the terms of the GNU General Public License
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   8)  *  as published by the Free Software Foundation; either version 2
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   9)  *  of the License, or (at your option) any later version.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  10)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  11)  *  This program is distributed in the hope that it will be useful,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  12)  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  13)  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  14)  *  GNU General Public License for more details.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  15)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  16)  *  You should have received a copy of the GNU General Public License
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  17)  *  along with this program; if not, write to the Free Software
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  18)  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  19)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  20) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  21) #include <sys/types.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  22) #include <fcntl.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  23) #include <unistd.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  24) #include <ctype.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  25) #include <stdlib.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  26) #include <string.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  27) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  28) #ifdef __sun__
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  29) #define CURS_MACROS
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  30) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  31) #include CURSES_LOC
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  32) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  33) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  34)  * Colors in ncurses 1.9.9e do not work properly since foreground and
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  35)  * background colors are OR'd rather than separately masked.  This version
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  36)  * of dialog was hacked to work with ncurses 1.9.9e, making it incompatible
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  37)  * with standard curses.  The simplest fix (to make this work with standard
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  38)  * curses) uses the wbkgdset() function, not used in the original hack.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  39)  * Turn it off if we're building with 1.9.9e, since it just confuses things.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  40)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  41) #if defined(NCURSES_VERSION) && defined(_NEED_WRAP) && !defined(GCC_PRINTFLIKE)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  42) #define OLD_NCURSES 1
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  43) #undef  wbkgdset
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  44) #define wbkgdset(w,p)		/*nothing */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  45) #else
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  46) #define OLD_NCURSES 0
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  47) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  48) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  49) #define TR(params) _tracef params
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  50) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  51) #define ESC 27
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  52) #define TAB 9
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  53) #define MAX_LEN 2048
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  54) #define BUF_SIZE (10*1024)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  55) #define MIN(x,y) (x < y ? x : y)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  56) #define MAX(x,y) (x > y ? x : y)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  57) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  58) #ifndef ACS_ULCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  59) #define ACS_ULCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  60) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  61) #ifndef ACS_LLCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  62) #define ACS_LLCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  63) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  64) #ifndef ACS_URCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  65) #define ACS_URCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  66) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  67) #ifndef ACS_LRCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  68) #define ACS_LRCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  69) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  70) #ifndef ACS_HLINE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  71) #define ACS_HLINE '-'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  72) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  73) #ifndef ACS_VLINE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  74) #define ACS_VLINE '|'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  75) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  76) #ifndef ACS_LTEE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  77) #define ACS_LTEE '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  78) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  79) #ifndef ACS_RTEE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  80) #define ACS_RTEE '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  81) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  82) #ifndef ACS_UARROW
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  83) #define ACS_UARROW '^'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  84) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  85) #ifndef ACS_DARROW
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  86) #define ACS_DARROW 'v'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  87) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  88) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  89) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  90)  * Attribute names
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  91)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  92) #define screen_attr                   attributes[0]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  93) #define shadow_attr                   attributes[1]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  94) #define dialog_attr                   attributes[2]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  95) #define title_attr                    attributes[3]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  96) #define border_attr                   attributes[4]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  97) #define button_active_attr            attributes[5]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  98) #define button_inactive_attr          attributes[6]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  99) #define button_key_active_attr        attributes[7]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 100) #define button_key_inactive_attr      attributes[8]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 101) #define button_label_active_attr      attributes[9]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 102) #define button_label_inactive_attr    attributes[10]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 103) #define inputbox_attr                 attributes[11]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 104) #define inputbox_border_attr          attributes[12]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 105) #define searchbox_attr                attributes[13]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 106) #define searchbox_title_attr          attributes[14]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 107) #define searchbox_border_attr         attributes[15]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 108) #define position_indicator_attr       attributes[16]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 109) #define menubox_attr                  attributes[17]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 110) #define menubox_border_attr           attributes[18]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 111) #define item_attr                     attributes[19]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 112) #define item_selected_attr            attributes[20]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 113) #define tag_attr                      attributes[21]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 114) #define tag_selected_attr             attributes[22]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 115) #define tag_key_attr                  attributes[23]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 116) #define tag_key_selected_attr         attributes[24]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 117) #define check_attr                    attributes[25]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 118) #define check_selected_attr           attributes[26]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 119) #define uarrow_attr                   attributes[27]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 120) #define darrow_attr                   attributes[28]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 121) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 122) /* number of attributes */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 123) #define ATTRIBUTE_COUNT               29
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 124) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 125) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 126)  * Global variables
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 127)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 128) extern bool use_colors;
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 129) extern bool use_shadow;
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 130) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 131) extern chtype attributes[];
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 132) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 133) extern const char *backtitle;
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 134) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 135) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 136)  * Function prototypes
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 137)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 138) extern void create_rc(const char *filename);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 139) extern int parse_rc(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 140) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 141) void init_dialog(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 142) void end_dialog(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 143) void attr_clear(WINDOW * win, int height, int width, chtype attr);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 144) void dialog_clear(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 145) void color_setup(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 146) void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 147) void print_button(WINDOW * win, const char *label, int y, int x, int selected);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 148) void print_title(WINDOW *dialog, const char *title, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 149) void draw_box(WINDOW * win, int y, int x, int height, int width, chtype box,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 150) 	      chtype border);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 151) void draw_shadow(WINDOW * win, int y, int x, int height, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 152) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 153) int first_alpha(const char *string, const char *exempt);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 154) int dialog_yesno(const char *title, const char *prompt, int height, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 155) int dialog_msgbox(const char *title, const char *prompt, int height,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 156) 		  int width, int pause);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 157) int dialog_textbox(const char *title, const char *file, int height, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 158) int dialog_menu(const char *title, const char *prompt, int height, int width,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 159) 		int menu_height, const char *choice, int item_no,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 160) 		const char *const *items);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 161) int dialog_checklist(const char *title, const char *prompt, int height,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 162) 		     int width, int list_height, int item_no,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 163) 		     const char *const *items);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 164) extern char dialog_input_result[];
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 165) int dialog_inputbox(const char *title, const char *prompt, int height,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 166) 		    int width, const char *init);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 167) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 168) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 169)  * This is the base for fictitious keys, which activate
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 170)  * the buttons.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 171)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 172)  * Mouse-generated keys are the following:
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 173)  *   -- the first 32 are used as numbers, in addition to '0'-'9'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 174)  *   -- the lowercase are used to signal mouse-enter events (M_EVENT + 'o')
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 175)  *   -- uppercase chars are used to invoke the button (M_EVENT + 'O')
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 176)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 177) #define M_EVENT (KEY_MAX+1)
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100    1) /***************************************************************************
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000    2)  *                                  _   _ ____  _
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000    3)  *  Project                     ___| | | |  _ \| |
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000    4)  *                             / __| | | | |_) | |
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000    5)  *                            | (__| |_| |  _ <| |___
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000    6)  *                             \___|\___/|_| \_\_____|
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000    7)  *
+ad9bc5976d (Max Mehl          2022-05-17 11:16:50 +0200    8)  * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100    9)  *
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   10)  * This software is licensed as described in the file COPYING, which
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   11)  * you should have received as part of this distribution. The terms
+4d2f800677 (Daniel Stenberg   2020-11-04 14:02:01 +0100   12)  * are also available at https://curl.se/docs/copyright.html.
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   13)  *
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   14)  * You may opt to use, copy, modify, merge, publish, distribute and/or sell
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   15)  * copies of the Software, and permit persons to whom the Software is
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   16)  * furnished to do so, under the terms of the COPYING file.
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   17)  *
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   18)  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   19)  * KIND, either express or implied.
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   20)  *
+ad9bc5976d (Max Mehl          2022-05-17 11:16:50 +0200   21)  * SPDX-License-Identifier: curl
+ad9bc5976d (Max Mehl          2022-05-17 11:16:50 +0200   22)  *
+1aeb635cdd (Daniel Stenberg   2011-03-10 11:48:02 +0100   23)  ***************************************************************************/
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   24) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   25) /*
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   26)  * The purpose of this test is to minimally exercise libcurl's internal
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   27)  * curl_m*printf formatting capabilities and handling of some data types.
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   28)  */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   29) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   30) #include "test.h"
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   31) 
+35682764a9 (Jay Satiro        2017-05-29 18:04:53 -0400   32) #include <limits.h>
+35682764a9 (Jay Satiro        2017-05-29 18:04:53 -0400   33) 
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   34) #ifdef HAVE_LOCALE_H
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   35) #  include <locale.h> /* for setlocale() */
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   36) #endif
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   37) 
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   38) #include "memdebug.h"
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   39) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200   40) #if (SIZEOF_CURL_OFF_T > SIZEOF_LONG)
+1c68e79091 (Yang Tse          2008-08-20 23:29:07 +0000   41) #  define MPRNT_SUFFIX_CURL_OFF_T  LL
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   42) #else
+1c68e79091 (Yang Tse          2008-08-20 23:29:07 +0000   43) #  define MPRNT_SUFFIX_CURL_OFF_T  L
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   44) #endif
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   45) 
+1c68e79091 (Yang Tse          2008-08-20 23:29:07 +0000   46) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   47) #ifdef CURL_ISOCPP
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   48) #  define MPRNT_OFF_T_C_HELPER2(Val,Suffix) Val ## Suffix
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   49) #else
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   50) #  define MPRNT_OFF_T_C_HELPER2(Val,Suffix) Val/**/Suffix
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   51) #endif
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   52) #define MPRNT_OFF_T_C_HELPER1(Val,Suffix) MPRNT_OFF_T_C_HELPER2(Val,Suffix)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   53) #define MPRNT_OFF_T_C(Val)  MPRNT_OFF_T_C_HELPER1(Val,MPRNT_SUFFIX_CURL_OFF_T)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   54) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   55) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   56) #define BUFSZ    256
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   57) #define USHORT_TESTS_ARRSZ 1 + 100
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   58) #define SSHORT_TESTS_ARRSZ 1 + 100
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   59) #define UINT_TESTS_ARRSZ   1 + 100
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   60) #define SINT_TESTS_ARRSZ   1 + 100
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000   61) #define ULONG_TESTS_ARRSZ  1 + 100
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000   62) #define SLONG_TESTS_ARRSZ  1 + 100
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000   63) #define COFFT_TESTS_ARRSZ  1 + 100
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   64) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   65) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   66) struct unsshort_st {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   67)   unsigned short num;   /* unsigned short  */
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   68)   const char *expected; /* expected string */
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   69)   char result[BUFSZ];   /* result string   */
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   70) };
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   71) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   72) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   73) struct sigshort_st {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   74)   short num;            /* signed short    */
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   75)   const char *expected; /* expected string */
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   76)   char result[BUFSZ];   /* result string   */
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   77) };
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   78) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000   79) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   80) struct unsint_st {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   81)   unsigned int num;     /* unsigned int    */
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   82)   const char *expected; /* expected string */
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   83)   char result[BUFSZ];   /* result string   */
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   84) };
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   85) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   86) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   87) struct sigint_st {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   88)   int num;              /* signed int      */
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   89)   const char *expected; /* expected string */
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   90)   char result[BUFSZ];   /* result string   */
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   91) };
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   92) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000   93) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   94) struct unslong_st {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   95)   unsigned long num;    /* unsigned long   */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   96)   const char *expected; /* expected string */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   97)   char result[BUFSZ];   /* result string   */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   98) };
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   99) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  100) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  101) struct siglong_st {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  102)   long num;             /* signed long     */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  103)   const char *expected; /* expected string */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  104)   char result[BUFSZ];   /* result string   */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  105) };
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  106) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  107) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  108) struct curloff_st {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  109)   curl_off_t num;       /* curl_off_t      */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  110)   const char *expected; /* expected string */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  111)   char result[BUFSZ];   /* result string   */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  112) };
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  113) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  114) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  115) static struct unsshort_st us_test[USHORT_TESTS_ARRSZ];
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  116) static struct sigshort_st ss_test[SSHORT_TESTS_ARRSZ];
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  117) static struct unsint_st   ui_test[UINT_TESTS_ARRSZ];
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  118) static struct sigint_st   si_test[SINT_TESTS_ARRSZ];
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  119) static struct unslong_st  ul_test[ULONG_TESTS_ARRSZ];
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  120) static struct siglong_st  sl_test[SLONG_TESTS_ARRSZ];
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  121) static struct curloff_st  co_test[COFFT_TESTS_ARRSZ];
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  122) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  123) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  124) static int test_unsigned_short_formatting(void)
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  125) {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  126)   int i, j;
+d250ed4753 (Marcel Raad       2019-04-05 11:18:12 +0200  127)   int num_ushort_tests = 0;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  128)   int failed = 0;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  129) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  130)   i = 1; us_test[i].num = 0xFFFFU; us_test[i].expected = "65535";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  131)   i++; us_test[i].num = 0xFF00U; us_test[i].expected = "65280";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  132)   i++; us_test[i].num = 0x00FFU; us_test[i].expected = "255";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  133) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  134)   i++; us_test[i].num = 0xF000U; us_test[i].expected = "61440";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  135)   i++; us_test[i].num = 0x0F00U; us_test[i].expected = "3840";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  136)   i++; us_test[i].num = 0x00F0U; us_test[i].expected = "240";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  137)   i++; us_test[i].num = 0x000FU; us_test[i].expected = "15";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  138) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  139)   i++; us_test[i].num = 0xC000U; us_test[i].expected = "49152";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  140)   i++; us_test[i].num = 0x0C00U; us_test[i].expected = "3072";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  141)   i++; us_test[i].num = 0x00C0U; us_test[i].expected = "192";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  142)   i++; us_test[i].num = 0x000CU; us_test[i].expected = "12";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  143) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  144)   i++; us_test[i].num = 0x0001U; us_test[i].expected = "1";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  145)   i++; us_test[i].num = 0x0000U; us_test[i].expected = "0";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  146) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  147)   num_ushort_tests = i;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  148) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  149)   for(i = 1; i <= num_ushort_tests; i++) {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  150) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  151)     for(j = 0; j<BUFSZ; j++)
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  152)       us_test[i].result[j] = 'X';
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  153)     us_test[i].result[BUFSZ-1] = '\0';
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  154) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  155)     (void)curl_msprintf(us_test[i].result, "%hu", us_test[i].num);
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  156) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  157)     if(memcmp(us_test[i].result,
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  158)                us_test[i].expected,
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  159)                strlen(us_test[i].expected))) {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  160)       printf("unsigned short test #%.2d: Failed (Expected: %s Got: %s)\n",
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  161)              i, us_test[i].expected, us_test[i].result);
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  162)       failed++;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  163)     }
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  164) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  165)   }
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  166) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  167)   if(!failed)
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  168)     printf("All curl_mprintf() unsigned short tests OK!\n");
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  169)   else
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  170)     printf("Some curl_mprintf() unsigned short tests Failed!\n");
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  171) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  172)   return failed;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  173) }
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  174) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  175) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  176) static int test_signed_short_formatting(void)
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  177) {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  178)   int i, j;
+d250ed4753 (Marcel Raad       2019-04-05 11:18:12 +0200  179)   int num_sshort_tests = 0;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  180)   int failed = 0;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  181) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  182)   i = 1; ss_test[i].num = 0x7FFF; ss_test[i].expected = "32767";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  183)   i++; ss_test[i].num = 0x7FFE; ss_test[i].expected = "32766";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  184)   i++; ss_test[i].num = 0x7FFD; ss_test[i].expected = "32765";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  185)   i++; ss_test[i].num = 0x7F00; ss_test[i].expected = "32512";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  186)   i++; ss_test[i].num = 0x07F0; ss_test[i].expected = "2032";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  187)   i++; ss_test[i].num = 0x007F; ss_test[i].expected = "127";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  188) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  189)   i++; ss_test[i].num = 0x7000; ss_test[i].expected = "28672";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  190)   i++; ss_test[i].num = 0x0700; ss_test[i].expected = "1792";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  191)   i++; ss_test[i].num = 0x0070; ss_test[i].expected = "112";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  192)   i++; ss_test[i].num = 0x0007; ss_test[i].expected = "7";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  193) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  194)   i++; ss_test[i].num = 0x5000; ss_test[i].expected = "20480";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  195)   i++; ss_test[i].num = 0x0500; ss_test[i].expected = "1280";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  196)   i++; ss_test[i].num = 0x0050; ss_test[i].expected = "80";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  197)   i++; ss_test[i].num = 0x0005; ss_test[i].expected = "5";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  198) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  199)   i++; ss_test[i].num = 0x0001; ss_test[i].expected = "1";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  200)   i++; ss_test[i].num = 0x0000; ss_test[i].expected = "0";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  201) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  202)   i++; ss_test[i].num = -0x7FFF -1; ss_test[i].expected = "-32768";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  203)   i++; ss_test[i].num = -0x7FFE -1; ss_test[i].expected = "-32767";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  204)   i++; ss_test[i].num = -0x7FFD -1; ss_test[i].expected = "-32766";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  205)   i++; ss_test[i].num = -0x7F00 -1; ss_test[i].expected = "-32513";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  206)   i++; ss_test[i].num = -0x07F0 -1; ss_test[i].expected = "-2033";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  207)   i++; ss_test[i].num = -0x007F -1; ss_test[i].expected = "-128";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  208) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  209)   i++; ss_test[i].num = -0x7000 -1; ss_test[i].expected = "-28673";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  210)   i++; ss_test[i].num = -0x0700 -1; ss_test[i].expected = "-1793";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  211)   i++; ss_test[i].num = -0x0070 -1; ss_test[i].expected = "-113";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  212)   i++; ss_test[i].num = -0x0007 -1; ss_test[i].expected = "-8";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  213) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  214)   i++; ss_test[i].num = -0x5000 -1; ss_test[i].expected = "-20481";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  215)   i++; ss_test[i].num = -0x0500 -1; ss_test[i].expected = "-1281";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  216)   i++; ss_test[i].num = -0x0050 -1; ss_test[i].expected = "-81";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  217)   i++; ss_test[i].num = -0x0005 -1; ss_test[i].expected = "-6";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  218) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  219)   i++; ss_test[i].num =  0x0000 -1; ss_test[i].expected = "-1";
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  220) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  221)   num_sshort_tests = i;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  222) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  223)   for(i = 1; i <= num_sshort_tests; i++) {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  224) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  225)     for(j = 0; j<BUFSZ; j++)
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  226)       ss_test[i].result[j] = 'X';
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  227)     ss_test[i].result[BUFSZ-1] = '\0';
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  228) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  229)     (void)curl_msprintf(ss_test[i].result, "%hd", ss_test[i].num);
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  230) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  231)     if(memcmp(ss_test[i].result,
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  232)               ss_test[i].expected,
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  233)               strlen(ss_test[i].expected))) {
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  234)       printf("signed short test #%.2d: Failed (Expected: %s Got: %s)\n",
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  235)              i, ss_test[i].expected, ss_test[i].result);
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  236)       failed++;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  237)     }
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  238) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  239)   }
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  240) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  241)   if(!failed)
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  242)     printf("All curl_mprintf() signed short tests OK!\n");
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  243)   else
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  244)     printf("Some curl_mprintf() signed short tests Failed!\n");
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  245) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  246)   return failed;
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000  247) }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  248) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  249) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  250) static int test_unsigned_int_formatting(void)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  251) {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  252)   int i, j;
+d250ed4753 (Marcel Raad       2019-04-05 11:18:12 +0200  253)   int num_uint_tests = 0;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  254)   int failed = 0;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  255) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  256) #if (SIZEOF_INT == 2)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  257) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  258)   i = 1; ui_test[i].num = 0xFFFFU; ui_test[i].expected = "65535";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  259)   i++; ui_test[i].num = 0xFF00U; ui_test[i].expected = "65280";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  260)   i++; ui_test[i].num = 0x00FFU; ui_test[i].expected = "255";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  261) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  262)   i++; ui_test[i].num = 0xF000U; ui_test[i].expected = "61440";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  263)   i++; ui_test[i].num = 0x0F00U; ui_test[i].expected = "3840";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  264)   i++; ui_test[i].num = 0x00F0U; ui_test[i].expected = "240";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  265)   i++; ui_test[i].num = 0x000FU; ui_test[i].expected = "15";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  266) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  267)   i++; ui_test[i].num = 0xC000U; ui_test[i].expected = "49152";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  268)   i++; ui_test[i].num = 0x0C00U; ui_test[i].expected = "3072";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  269)   i++; ui_test[i].num = 0x00C0U; ui_test[i].expected = "192";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  270)   i++; ui_test[i].num = 0x000CU; ui_test[i].expected = "12";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  271) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  272)   i++; ui_test[i].num = 0x0001U; ui_test[i].expected = "1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  273)   i++; ui_test[i].num = 0x0000U; ui_test[i].expected = "0";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  274) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  275)   num_uint_tests = i;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  276) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  277) #elif (SIZEOF_INT == 4)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  278) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  279)   i = 1; ui_test[i].num = 0xFFFFFFFFU; ui_test[i].expected = "4294967295";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  280)   i++; ui_test[i].num = 0xFFFF0000U; ui_test[i].expected = "4294901760";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  281)   i++; ui_test[i].num = 0x0000FFFFU; ui_test[i].expected = "65535";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  282) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  283)   i++; ui_test[i].num = 0xFF000000U; ui_test[i].expected = "4278190080";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  284)   i++; ui_test[i].num = 0x00FF0000U; ui_test[i].expected = "16711680";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  285)   i++; ui_test[i].num = 0x0000FF00U; ui_test[i].expected = "65280";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  286)   i++; ui_test[i].num = 0x000000FFU; ui_test[i].expected = "255";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  287) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  288)   i++; ui_test[i].num = 0xF0000000U; ui_test[i].expected = "4026531840";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  289)   i++; ui_test[i].num = 0x0F000000U; ui_test[i].expected = "251658240";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  290)   i++; ui_test[i].num = 0x00F00000U; ui_test[i].expected = "15728640";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  291)   i++; ui_test[i].num = 0x000F0000U; ui_test[i].expected = "983040";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  292)   i++; ui_test[i].num = 0x0000F000U; ui_test[i].expected = "61440";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  293)   i++; ui_test[i].num = 0x00000F00U; ui_test[i].expected = "3840";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  294)   i++; ui_test[i].num = 0x000000F0U; ui_test[i].expected = "240";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  295)   i++; ui_test[i].num = 0x0000000FU; ui_test[i].expected = "15";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  296) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  297)   i++; ui_test[i].num = 0xC0000000U; ui_test[i].expected = "3221225472";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  298)   i++; ui_test[i].num = 0x0C000000U; ui_test[i].expected = "201326592";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  299)   i++; ui_test[i].num = 0x00C00000U; ui_test[i].expected = "12582912";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  300)   i++; ui_test[i].num = 0x000C0000U; ui_test[i].expected = "786432";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  301)   i++; ui_test[i].num = 0x0000C000U; ui_test[i].expected = "49152";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  302)   i++; ui_test[i].num = 0x00000C00U; ui_test[i].expected = "3072";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  303)   i++; ui_test[i].num = 0x000000C0U; ui_test[i].expected = "192";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  304)   i++; ui_test[i].num = 0x0000000CU; ui_test[i].expected = "12";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  305) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  306)   i++; ui_test[i].num = 0x00000001U; ui_test[i].expected = "1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  307)   i++; ui_test[i].num = 0x00000000U; ui_test[i].expected = "0";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  308) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  309)   num_uint_tests = i;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  310) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  311) #elif (SIZEOF_INT == 8)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  312) 
+adeaf95e20 (Daniel Stenberg   2016-04-03 16:04:20 +0200  313)   /* !checksrc! disable LONGLINE all */
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  314)   i = 1; ui_test[i].num = 0xFFFFFFFFFFFFFFFFU; ui_test[i].expected = "18446744073709551615";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  315)   i++; ui_test[i].num = 0xFFFFFFFF00000000U; ui_test[i].expected = "18446744069414584320";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  316)   i++; ui_test[i].num = 0x00000000FFFFFFFFU; ui_test[i].expected = "4294967295";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  317) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  318)   i++; ui_test[i].num = 0xFFFF000000000000U; ui_test[i].expected = "18446462598732840960";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  319)   i++; ui_test[i].num = 0x0000FFFF00000000U; ui_test[i].expected = "281470681743360";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  320)   i++; ui_test[i].num = 0x00000000FFFF0000U; ui_test[i].expected = "4294901760";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  321)   i++; ui_test[i].num = 0x000000000000FFFFU; ui_test[i].expected = "65535";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  322) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  323)   i++; ui_test[i].num = 0xFF00000000000000U; ui_test[i].expected = "18374686479671623680";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  324)   i++; ui_test[i].num = 0x00FF000000000000U; ui_test[i].expected = "71776119061217280";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  325)   i++; ui_test[i].num = 0x0000FF0000000000U; ui_test[i].expected = "280375465082880";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  326)   i++; ui_test[i].num = 0x000000FF00000000U; ui_test[i].expected = "1095216660480";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  327)   i++; ui_test[i].num = 0x00000000FF000000U; ui_test[i].expected = "4278190080";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  328)   i++; ui_test[i].num = 0x0000000000FF0000U; ui_test[i].expected = "16711680";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  329)   i++; ui_test[i].num = 0x000000000000FF00U; ui_test[i].expected = "65280";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  330)   i++; ui_test[i].num = 0x00000000000000FFU; ui_test[i].expected = "255";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  331) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  332)   i++; ui_test[i].num = 0xF000000000000000U; ui_test[i].expected = "17293822569102704640";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  333)   i++; ui_test[i].num = 0x0F00000000000000U; ui_test[i].expected = "1080863910568919040";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  334)   i++; ui_test[i].num = 0x00F0000000000000U; ui_test[i].expected = "67553994410557440";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  335)   i++; ui_test[i].num = 0x000F000000000000U; ui_test[i].expected = "4222124650659840";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  336)   i++; ui_test[i].num = 0x0000F00000000000U; ui_test[i].expected = "263882790666240";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  337)   i++; ui_test[i].num = 0x00000F0000000000U; ui_test[i].expected = "16492674416640";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  338)   i++; ui_test[i].num = 0x000000F000000000U; ui_test[i].expected = "1030792151040";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  339)   i++; ui_test[i].num = 0x0000000F00000000U; ui_test[i].expected = "64424509440";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  340)   i++; ui_test[i].num = 0x00000000F0000000U; ui_test[i].expected = "4026531840";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  341)   i++; ui_test[i].num = 0x000000000F000000U; ui_test[i].expected = "251658240";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  342)   i++; ui_test[i].num = 0x0000000000F00000U; ui_test[i].expected = "15728640";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  343)   i++; ui_test[i].num = 0x00000000000F0000U; ui_test[i].expected = "983040";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  344)   i++; ui_test[i].num = 0x000000000000F000U; ui_test[i].expected = "61440";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  345)   i++; ui_test[i].num = 0x0000000000000F00U; ui_test[i].expected = "3840";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  346)   i++; ui_test[i].num = 0x00000000000000F0U; ui_test[i].expected = "240";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  347)   i++; ui_test[i].num = 0x000000000000000FU; ui_test[i].expected = "15";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  348) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  349)   i++; ui_test[i].num = 0xC000000000000000U; ui_test[i].expected = "13835058055282163712";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  350)   i++; ui_test[i].num = 0x0C00000000000000U; ui_test[i].expected = "864691128455135232";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  351)   i++; ui_test[i].num = 0x00C0000000000000U; ui_test[i].expected = "54043195528445952";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  352)   i++; ui_test[i].num = 0x000C000000000000U; ui_test[i].expected = "3377699720527872";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  353)   i++; ui_test[i].num = 0x0000C00000000000U; ui_test[i].expected = "211106232532992";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  354)   i++; ui_test[i].num = 0x00000C0000000000U; ui_test[i].expected = "13194139533312";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  355)   i++; ui_test[i].num = 0x000000C000000000U; ui_test[i].expected = "824633720832";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  356)   i++; ui_test[i].num = 0x0000000C00000000U; ui_test[i].expected = "51539607552";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  357)   i++; ui_test[i].num = 0x00000000C0000000U; ui_test[i].expected = "3221225472";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  358)   i++; ui_test[i].num = 0x000000000C000000U; ui_test[i].expected = "201326592";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  359)   i++; ui_test[i].num = 0x0000000000C00000U; ui_test[i].expected = "12582912";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  360)   i++; ui_test[i].num = 0x00000000000C0000U; ui_test[i].expected = "786432";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  361)   i++; ui_test[i].num = 0x000000000000C000U; ui_test[i].expected = "49152";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  362)   i++; ui_test[i].num = 0x0000000000000C00U; ui_test[i].expected = "3072";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  363)   i++; ui_test[i].num = 0x00000000000000C0U; ui_test[i].expected = "192";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  364)   i++; ui_test[i].num = 0x000000000000000CU; ui_test[i].expected = "12";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  365) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  366)   i++; ui_test[i].num = 0x00000001U; ui_test[i].expected = "1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  367)   i++; ui_test[i].num = 0x00000000U; ui_test[i].expected = "0";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  368) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  369)   num_uint_tests = i;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  370) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  371) #endif
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  372) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  373)   for(i = 1; i <= num_uint_tests; i++) {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  374) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  375)     for(j = 0; j<BUFSZ; j++)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  376)       ui_test[i].result[j] = 'X';
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  377)     ui_test[i].result[BUFSZ-1] = '\0';
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  378) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  379)     (void)curl_msprintf(ui_test[i].result, "%u", ui_test[i].num);
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  380) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  381)     if(memcmp(ui_test[i].result,
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  382)                ui_test[i].expected,
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  383)                strlen(ui_test[i].expected))) {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  384)       printf("unsigned int test #%.2d: Failed (Expected: %s Got: %s)\n",
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  385)              i, ui_test[i].expected, ui_test[i].result);
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  386)       failed++;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  387)     }
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  388) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  389)   }
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  390) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  391)   if(!failed)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  392)     printf("All curl_mprintf() unsigned int tests OK!\n");
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  393)   else
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  394)     printf("Some curl_mprintf() unsigned int tests Failed!\n");
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  395) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  396)   return failed;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  397) }
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  398) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  399) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  400) static int test_signed_int_formatting(void)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  401) {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  402)   int i, j;
+d250ed4753 (Marcel Raad       2019-04-05 11:18:12 +0200  403)   int num_sint_tests = 0;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  404)   int failed = 0;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  405) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  406) #if (SIZEOF_INT == 2)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  407) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  408)   i = 1; si_test[i].num = 0x7FFF; si_test[i].expected = "32767";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  409)   i++; si_test[i].num = 0x7FFE; si_test[i].expected = "32766";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  410)   i++; si_test[i].num = 0x7FFD; si_test[i].expected = "32765";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  411)   i++; si_test[i].num = 0x7F00; si_test[i].expected = "32512";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  412)   i++; si_test[i].num = 0x07F0; si_test[i].expected = "2032";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  413)   i++; si_test[i].num = 0x007F; si_test[i].expected = "127";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  414) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  415)   i++; si_test[i].num = 0x7000; si_test[i].expected = "28672";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  416)   i++; si_test[i].num = 0x0700; si_test[i].expected = "1792";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  417)   i++; si_test[i].num = 0x0070; si_test[i].expected = "112";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  418)   i++; si_test[i].num = 0x0007; si_test[i].expected = "7";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  419) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  420)   i++; si_test[i].num = 0x5000; si_test[i].expected = "20480";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  421)   i++; si_test[i].num = 0x0500; si_test[i].expected = "1280";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  422)   i++; si_test[i].num = 0x0050; si_test[i].expected = "80";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  423)   i++; si_test[i].num = 0x0005; si_test[i].expected = "5";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  424) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  425)   i++; si_test[i].num = 0x0001; si_test[i].expected = "1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  426)   i++; si_test[i].num = 0x0000; si_test[i].expected = "0";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  427) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  428)   i++; si_test[i].num = -0x7FFF -1; si_test[i].expected = "-32768";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  429)   i++; si_test[i].num = -0x7FFE -1; si_test[i].expected = "-32767";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  430)   i++; si_test[i].num = -0x7FFD -1; si_test[i].expected = "-32766";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  431)   i++; si_test[i].num = -0x7F00 -1; si_test[i].expected = "-32513";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  432)   i++; si_test[i].num = -0x07F0 -1; si_test[i].expected = "-2033";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  433)   i++; si_test[i].num = -0x007F -1; si_test[i].expected = "-128";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  434) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  435)   i++; si_test[i].num = -0x7000 -1; si_test[i].expected = "-28673";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  436)   i++; si_test[i].num = -0x0700 -1; si_test[i].expected = "-1793";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  437)   i++; si_test[i].num = -0x0070 -1; si_test[i].expected = "-113";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  438)   i++; si_test[i].num = -0x0007 -1; si_test[i].expected = "-8";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  439) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  440)   i++; si_test[i].num = -0x5000 -1; si_test[i].expected = "-20481";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  441)   i++; si_test[i].num = -0x0500 -1; si_test[i].expected = "-1281";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  442)   i++; si_test[i].num = -0x0050 -1; si_test[i].expected = "-81";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  443)   i++; si_test[i].num = -0x0005 -1; si_test[i].expected = "-6";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  444) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  445)   i++; si_test[i].num =  0x0000 -1; si_test[i].expected = "-1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  446) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  447)   num_sint_tests = i;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  448) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  449) #elif (SIZEOF_INT == 4)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  450) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  451)   i = 1; si_test[i].num = 0x7FFFFFFF; si_test[i].expected = "2147483647";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  452)   i++; si_test[i].num = 0x7FFFFFFE; si_test[i].expected = "2147483646";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  453)   i++; si_test[i].num = 0x7FFFFFFD; si_test[i].expected = "2147483645";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  454)   i++; si_test[i].num = 0x7FFF0000; si_test[i].expected = "2147418112";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  455)   i++; si_test[i].num = 0x00007FFF; si_test[i].expected = "32767";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  456) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  457)   i++; si_test[i].num = 0x7F000000; si_test[i].expected = "2130706432";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  458)   i++; si_test[i].num = 0x007F0000; si_test[i].expected = "8323072";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  459)   i++; si_test[i].num = 0x00007F00; si_test[i].expected = "32512";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  460)   i++; si_test[i].num = 0x0000007F; si_test[i].expected = "127";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  461) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  462)   i++; si_test[i].num = 0x70000000; si_test[i].expected = "1879048192";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  463)   i++; si_test[i].num = 0x07000000; si_test[i].expected = "117440512";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  464)   i++; si_test[i].num = 0x00700000; si_test[i].expected = "7340032";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  465)   i++; si_test[i].num = 0x00070000; si_test[i].expected = "458752";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  466)   i++; si_test[i].num = 0x00007000; si_test[i].expected = "28672";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  467)   i++; si_test[i].num = 0x00000700; si_test[i].expected = "1792";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  468)   i++; si_test[i].num = 0x00000070; si_test[i].expected = "112";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  469)   i++; si_test[i].num = 0x00000007; si_test[i].expected = "7";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  470) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  471)   i++; si_test[i].num = 0x50000000; si_test[i].expected = "1342177280";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  472)   i++; si_test[i].num = 0x05000000; si_test[i].expected = "83886080";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  473)   i++; si_test[i].num = 0x00500000; si_test[i].expected = "5242880";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  474)   i++; si_test[i].num = 0x00050000; si_test[i].expected = "327680";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  475)   i++; si_test[i].num = 0x00005000; si_test[i].expected = "20480";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  476)   i++; si_test[i].num = 0x00000500; si_test[i].expected = "1280";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  477)   i++; si_test[i].num = 0x00000050; si_test[i].expected = "80";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  478)   i++; si_test[i].num = 0x00000005; si_test[i].expected = "5";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  479) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  480)   i++; si_test[i].num = 0x00000001; si_test[i].expected = "1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  481)   i++; si_test[i].num = 0x00000000; si_test[i].expected = "0";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  482) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  483)   i++; si_test[i].num = -0x7FFFFFFF -1; si_test[i].expected = "-2147483648";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  484)   i++; si_test[i].num = -0x7FFFFFFE -1; si_test[i].expected = "-2147483647";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  485)   i++; si_test[i].num = -0x7FFFFFFD -1; si_test[i].expected = "-2147483646";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  486)   i++; si_test[i].num = -0x7FFF0000 -1; si_test[i].expected = "-2147418113";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  487)   i++; si_test[i].num = -0x00007FFF -1; si_test[i].expected = "-32768";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  488) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  489)   i++; si_test[i].num = -0x7F000000 -1; si_test[i].expected = "-2130706433";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  490)   i++; si_test[i].num = -0x007F0000 -1; si_test[i].expected = "-8323073";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  491)   i++; si_test[i].num = -0x00007F00 -1; si_test[i].expected = "-32513";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  492)   i++; si_test[i].num = -0x0000007F -1; si_test[i].expected = "-128";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  493) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  494)   i++; si_test[i].num = -0x70000000 -1; si_test[i].expected = "-1879048193";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  495)   i++; si_test[i].num = -0x07000000 -1; si_test[i].expected = "-117440513";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  496)   i++; si_test[i].num = -0x00700000 -1; si_test[i].expected = "-7340033";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  497)   i++; si_test[i].num = -0x00070000 -1; si_test[i].expected = "-458753";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  498)   i++; si_test[i].num = -0x00007000 -1; si_test[i].expected = "-28673";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  499)   i++; si_test[i].num = -0x00000700 -1; si_test[i].expected = "-1793";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  500)   i++; si_test[i].num = -0x00000070 -1; si_test[i].expected = "-113";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  501)   i++; si_test[i].num = -0x00000007 -1; si_test[i].expected = "-8";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  502) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  503)   i++; si_test[i].num = -0x50000000 -1; si_test[i].expected = "-1342177281";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  504)   i++; si_test[i].num = -0x05000000 -1; si_test[i].expected = "-83886081";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  505)   i++; si_test[i].num = -0x00500000 -1; si_test[i].expected = "-5242881";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  506)   i++; si_test[i].num = -0x00050000 -1; si_test[i].expected = "-327681";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  507)   i++; si_test[i].num = -0x00005000 -1; si_test[i].expected = "-20481";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  508)   i++; si_test[i].num = -0x00000500 -1; si_test[i].expected = "-1281";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  509)   i++; si_test[i].num = -0x00000050 -1; si_test[i].expected = "-81";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  510)   i++; si_test[i].num = -0x00000005 -1; si_test[i].expected = "-6";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  511) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  512)   i++; si_test[i].num =  0x00000000 -1; si_test[i].expected = "-1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  513) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  514)   num_sint_tests = i;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  515) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  516) #elif (SIZEOF_INT == 8)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  517) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  518)   i = 1; si_test[i].num = 0x7FFFFFFFFFFFFFFF; si_test[i].expected = "9223372036854775807";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  519)   i++; si_test[i].num = 0x7FFFFFFFFFFFFFFE; si_test[i].expected = "9223372036854775806";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  520)   i++; si_test[i].num = 0x7FFFFFFFFFFFFFFD; si_test[i].expected = "9223372036854775805";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  521)   i++; si_test[i].num = 0x7FFFFFFF00000000; si_test[i].expected = "9223372032559808512";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  522)   i++; si_test[i].num = 0x000000007FFFFFFF; si_test[i].expected = "2147483647";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  523) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  524)   i++; si_test[i].num = 0x7FFF000000000000; si_test[i].expected = "9223090561878065152";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  525)   i++; si_test[i].num = 0x00007FFF00000000; si_test[i].expected = "140733193388032";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  526)   i++; si_test[i].num = 0x000000007FFF0000; si_test[i].expected = "2147418112";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  527)   i++; si_test[i].num = 0x0000000000007FFF; si_test[i].expected = "32767";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  528) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  529)   i++; si_test[i].num = 0x7F00000000000000; si_test[i].expected = "9151314442816847872";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  530)   i++; si_test[i].num = 0x007F000000000000; si_test[i].expected = "35747322042253312";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  531)   i++; si_test[i].num = 0x00007F0000000000; si_test[i].expected = "139637976727552";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  532)   i++; si_test[i].num = 0x0000007F00000000; si_test[i].expected = "545460846592";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  533)   i++; si_test[i].num = 0x000000007F000000; si_test[i].expected = "2130706432";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  534)   i++; si_test[i].num = 0x00000000007F0000; si_test[i].expected = "8323072";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  535)   i++; si_test[i].num = 0x0000000000007F00; si_test[i].expected = "32512";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  536)   i++; si_test[i].num = 0x000000000000007F; si_test[i].expected = "127";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  537) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  538)   i++; si_test[i].num = 0x7000000000000000; si_test[i].expected = "8070450532247928832";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  539)   i++; si_test[i].num = 0x0700000000000000; si_test[i].expected = "504403158265495552";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  540)   i++; si_test[i].num = 0x0070000000000000; si_test[i].expected = "31525197391593472";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  541)   i++; si_test[i].num = 0x0007000000000000; si_test[i].expected = "1970324836974592";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  542)   i++; si_test[i].num = 0x0000700000000000; si_test[i].expected = "123145302310912";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  543)   i++; si_test[i].num = 0x0000070000000000; si_test[i].expected = "7696581394432";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  544)   i++; si_test[i].num = 0x0000007000000000; si_test[i].expected = "481036337152";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  545)   i++; si_test[i].num = 0x0000000700000000; si_test[i].expected = "30064771072";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  546)   i++; si_test[i].num = 0x0000000070000000; si_test[i].expected = "1879048192";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  547)   i++; si_test[i].num = 0x0000000007000000; si_test[i].expected = "117440512";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  548)   i++; si_test[i].num = 0x0000000000700000; si_test[i].expected = "7340032";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  549)   i++; si_test[i].num = 0x0000000000070000; si_test[i].expected = "458752";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  550)   i++; si_test[i].num = 0x0000000000007000; si_test[i].expected = "28672";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  551)   i++; si_test[i].num = 0x0000000000000700; si_test[i].expected = "1792";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  552)   i++; si_test[i].num = 0x0000000000000070; si_test[i].expected = "112";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  553)   i++; si_test[i].num = 0x0000000000000007; si_test[i].expected = "7";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  554) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  555)   i++; si_test[i].num = 0x0000000000000001; si_test[i].expected = "1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  556)   i++; si_test[i].num = 0x0000000000000000; si_test[i].expected = "0";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  557) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  558)   i++; si_test[i].num = -0x7FFFFFFFFFFFFFFF -1; si_test[i].expected = "-9223372036854775808";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  559)   i++; si_test[i].num = -0x7FFFFFFFFFFFFFFE -1; si_test[i].expected = "-9223372036854775807";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  560)   i++; si_test[i].num = -0x7FFFFFFFFFFFFFFD -1; si_test[i].expected = "-9223372036854775806";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  561)   i++; si_test[i].num = -0x7FFFFFFF00000000 -1; si_test[i].expected = "-9223372032559808513";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  562)   i++; si_test[i].num = -0x000000007FFFFFFF -1; si_test[i].expected = "-2147483648";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  563) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  564)   i++; si_test[i].num = -0x7FFF000000000000 -1; si_test[i].expected = "-9223090561878065153";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  565)   i++; si_test[i].num = -0x00007FFF00000000 -1; si_test[i].expected = "-140733193388033";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  566)   i++; si_test[i].num = -0x000000007FFF0000 -1; si_test[i].expected = "-2147418113";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  567)   i++; si_test[i].num = -0x0000000000007FFF -1; si_test[i].expected = "-32768";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  568) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  569)   i++; si_test[i].num = -0x7F00000000000000 -1; si_test[i].expected = "-9151314442816847873";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  570)   i++; si_test[i].num = -0x007F000000000000 -1; si_test[i].expected = "-35747322042253313";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  571)   i++; si_test[i].num = -0x00007F0000000000 -1; si_test[i].expected = "-139637976727553";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  572)   i++; si_test[i].num = -0x0000007F00000000 -1; si_test[i].expected = "-545460846593";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  573)   i++; si_test[i].num = -0x000000007F000000 -1; si_test[i].expected = "-2130706433";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  574)   i++; si_test[i].num = -0x00000000007F0000 -1; si_test[i].expected = "-8323073";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  575)   i++; si_test[i].num = -0x0000000000007F00 -1; si_test[i].expected = "-32513";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  576)   i++; si_test[i].num = -0x000000000000007F -1; si_test[i].expected = "-128";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  577) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  578)   i++; si_test[i].num = -0x7000000000000000 -1; si_test[i].expected = "-8070450532247928833";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  579)   i++; si_test[i].num = -0x0700000000000000 -1; si_test[i].expected = "-504403158265495553";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  580)   i++; si_test[i].num = -0x0070000000000000 -1; si_test[i].expected = "-31525197391593473";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  581)   i++; si_test[i].num = -0x0007000000000000 -1; si_test[i].expected = "-1970324836974593";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  582)   i++; si_test[i].num = -0x0000700000000000 -1; si_test[i].expected = "-123145302310913";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  583)   i++; si_test[i].num = -0x0000070000000000 -1; si_test[i].expected = "-7696581394433";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  584)   i++; si_test[i].num = -0x0000007000000000 -1; si_test[i].expected = "-481036337153";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  585)   i++; si_test[i].num = -0x0000000700000000 -1; si_test[i].expected = "-30064771073";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  586)   i++; si_test[i].num = -0x0000000070000000 -1; si_test[i].expected = "-1879048193";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  587)   i++; si_test[i].num = -0x0000000007000000 -1; si_test[i].expected = "-117440513";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  588)   i++; si_test[i].num = -0x0000000000700000 -1; si_test[i].expected = "-7340033";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  589)   i++; si_test[i].num = -0x0000000000070000 -1; si_test[i].expected = "-458753";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  590)   i++; si_test[i].num = -0x0000000000007000 -1; si_test[i].expected = "-28673";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  591)   i++; si_test[i].num = -0x0000000000000700 -1; si_test[i].expected = "-1793";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  592)   i++; si_test[i].num = -0x0000000000000070 -1; si_test[i].expected = "-113";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  593)   i++; si_test[i].num = -0x0000000000000007 -1; si_test[i].expected = "-8";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  594) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  595)   i++; si_test[i].num =  0x0000000000000000 -1; si_test[i].expected = "-1";
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  596) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  597)   num_sint_tests = i;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  598) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  599) #endif
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  600) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  601)   for(i = 1; i <= num_sint_tests; i++) {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  602) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  603)     for(j = 0; j<BUFSZ; j++)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  604)       si_test[i].result[j] = 'X';
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  605)     si_test[i].result[BUFSZ-1] = '\0';
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  606) 
+62d94ff342 (Yang Tse          2008-08-24 17:10:24 +0000  607)     (void)curl_msprintf(si_test[i].result, "%d", si_test[i].num);
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  608) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  609)     if(memcmp(si_test[i].result,
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  610)               si_test[i].expected,
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  611)               strlen(si_test[i].expected))) {
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  612)       printf("signed int test #%.2d: Failed (Expected: %s Got: %s)\n",
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  613)              i, si_test[i].expected, si_test[i].result);
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  614)       failed++;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  615)     }
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  616) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  617)   }
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  618) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  619)   if(!failed)
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  620)     printf("All curl_mprintf() signed int tests OK!\n");
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  621)   else
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  622)     printf("Some curl_mprintf() signed int tests Failed!\n");
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  623) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  624)   return failed;
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  625) }
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  626) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  627) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  628) static int test_unsigned_long_formatting(void)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  629) {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  630)   int i, j;
+d250ed4753 (Marcel Raad       2019-04-05 11:18:12 +0200  631)   int num_ulong_tests = 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  632)   int failed = 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  633) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200  634) #if (SIZEOF_LONG == 2)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  635) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  636)   i = 1; ul_test[i].num = 0xFFFFUL; ul_test[i].expected = "65535";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  637)   i++; ul_test[i].num = 0xFF00UL; ul_test[i].expected = "65280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  638)   i++; ul_test[i].num = 0x00FFUL; ul_test[i].expected = "255";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  639) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  640)   i++; ul_test[i].num = 0xF000UL; ul_test[i].expected = "61440";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  641)   i++; ul_test[i].num = 0x0F00UL; ul_test[i].expected = "3840";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  642)   i++; ul_test[i].num = 0x00F0UL; ul_test[i].expected = "240";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  643)   i++; ul_test[i].num = 0x000FUL; ul_test[i].expected = "15";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  644) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  645)   i++; ul_test[i].num = 0xC000UL; ul_test[i].expected = "49152";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  646)   i++; ul_test[i].num = 0x0C00UL; ul_test[i].expected = "3072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  647)   i++; ul_test[i].num = 0x00C0UL; ul_test[i].expected = "192";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  648)   i++; ul_test[i].num = 0x000CUL; ul_test[i].expected = "12";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  649) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  650)   i++; ul_test[i].num = 0x0001UL; ul_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  651)   i++; ul_test[i].num = 0x0000UL; ul_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  652) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  653)   num_ulong_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  654) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200  655) #elif (SIZEOF_LONG == 4)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  656) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  657)   i = 1; ul_test[i].num = 0xFFFFFFFFUL; ul_test[i].expected = "4294967295";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  658)   i++; ul_test[i].num = 0xFFFF0000UL; ul_test[i].expected = "4294901760";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  659)   i++; ul_test[i].num = 0x0000FFFFUL; ul_test[i].expected = "65535";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  660) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  661)   i++; ul_test[i].num = 0xFF000000UL; ul_test[i].expected = "4278190080";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  662)   i++; ul_test[i].num = 0x00FF0000UL; ul_test[i].expected = "16711680";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  663)   i++; ul_test[i].num = 0x0000FF00UL; ul_test[i].expected = "65280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  664)   i++; ul_test[i].num = 0x000000FFUL; ul_test[i].expected = "255";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  665) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  666)   i++; ul_test[i].num = 0xF0000000UL; ul_test[i].expected = "4026531840";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  667)   i++; ul_test[i].num = 0x0F000000UL; ul_test[i].expected = "251658240";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  668)   i++; ul_test[i].num = 0x00F00000UL; ul_test[i].expected = "15728640";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  669)   i++; ul_test[i].num = 0x000F0000UL; ul_test[i].expected = "983040";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  670)   i++; ul_test[i].num = 0x0000F000UL; ul_test[i].expected = "61440";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  671)   i++; ul_test[i].num = 0x00000F00UL; ul_test[i].expected = "3840";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  672)   i++; ul_test[i].num = 0x000000F0UL; ul_test[i].expected = "240";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  673)   i++; ul_test[i].num = 0x0000000FUL; ul_test[i].expected = "15";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  674) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  675)   i++; ul_test[i].num = 0xC0000000UL; ul_test[i].expected = "3221225472";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  676)   i++; ul_test[i].num = 0x0C000000UL; ul_test[i].expected = "201326592";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  677)   i++; ul_test[i].num = 0x00C00000UL; ul_test[i].expected = "12582912";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  678)   i++; ul_test[i].num = 0x000C0000UL; ul_test[i].expected = "786432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  679)   i++; ul_test[i].num = 0x0000C000UL; ul_test[i].expected = "49152";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  680)   i++; ul_test[i].num = 0x00000C00UL; ul_test[i].expected = "3072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  681)   i++; ul_test[i].num = 0x000000C0UL; ul_test[i].expected = "192";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  682)   i++; ul_test[i].num = 0x0000000CUL; ul_test[i].expected = "12";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  683) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  684)   i++; ul_test[i].num = 0x00000001UL; ul_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  685)   i++; ul_test[i].num = 0x00000000UL; ul_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  686) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  687)   num_ulong_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  688) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200  689) #elif (SIZEOF_LONG == 8)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  690) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  691)   i = 1; ul_test[i].num = 0xFFFFFFFFFFFFFFFFUL; ul_test[i].expected = "18446744073709551615";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  692)   i++; ul_test[i].num = 0xFFFFFFFF00000000UL; ul_test[i].expected = "18446744069414584320";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  693)   i++; ul_test[i].num = 0x00000000FFFFFFFFUL; ul_test[i].expected = "4294967295";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  694) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  695)   i++; ul_test[i].num = 0xFFFF000000000000UL; ul_test[i].expected = "18446462598732840960";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  696)   i++; ul_test[i].num = 0x0000FFFF00000000UL; ul_test[i].expected = "281470681743360";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  697)   i++; ul_test[i].num = 0x00000000FFFF0000UL; ul_test[i].expected = "4294901760";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  698)   i++; ul_test[i].num = 0x000000000000FFFFUL; ul_test[i].expected = "65535";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  699) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  700)   i++; ul_test[i].num = 0xFF00000000000000UL; ul_test[i].expected = "18374686479671623680";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  701)   i++; ul_test[i].num = 0x00FF000000000000UL; ul_test[i].expected = "71776119061217280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  702)   i++; ul_test[i].num = 0x0000FF0000000000UL; ul_test[i].expected = "280375465082880";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  703)   i++; ul_test[i].num = 0x000000FF00000000UL; ul_test[i].expected = "1095216660480";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  704)   i++; ul_test[i].num = 0x00000000FF000000UL; ul_test[i].expected = "4278190080";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  705)   i++; ul_test[i].num = 0x0000000000FF0000UL; ul_test[i].expected = "16711680";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  706)   i++; ul_test[i].num = 0x000000000000FF00UL; ul_test[i].expected = "65280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  707)   i++; ul_test[i].num = 0x00000000000000FFUL; ul_test[i].expected = "255";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  708) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  709)   i++; ul_test[i].num = 0xF000000000000000UL; ul_test[i].expected = "17293822569102704640";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  710)   i++; ul_test[i].num = 0x0F00000000000000UL; ul_test[i].expected = "1080863910568919040";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  711)   i++; ul_test[i].num = 0x00F0000000000000UL; ul_test[i].expected = "67553994410557440";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  712)   i++; ul_test[i].num = 0x000F000000000000UL; ul_test[i].expected = "4222124650659840";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  713)   i++; ul_test[i].num = 0x0000F00000000000UL; ul_test[i].expected = "263882790666240";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  714)   i++; ul_test[i].num = 0x00000F0000000000UL; ul_test[i].expected = "16492674416640";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  715)   i++; ul_test[i].num = 0x000000F000000000UL; ul_test[i].expected = "1030792151040";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  716)   i++; ul_test[i].num = 0x0000000F00000000UL; ul_test[i].expected = "64424509440";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  717)   i++; ul_test[i].num = 0x00000000F0000000UL; ul_test[i].expected = "4026531840";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  718)   i++; ul_test[i].num = 0x000000000F000000UL; ul_test[i].expected = "251658240";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  719)   i++; ul_test[i].num = 0x0000000000F00000UL; ul_test[i].expected = "15728640";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  720)   i++; ul_test[i].num = 0x00000000000F0000UL; ul_test[i].expected = "983040";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  721)   i++; ul_test[i].num = 0x000000000000F000UL; ul_test[i].expected = "61440";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  722)   i++; ul_test[i].num = 0x0000000000000F00UL; ul_test[i].expected = "3840";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  723)   i++; ul_test[i].num = 0x00000000000000F0UL; ul_test[i].expected = "240";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  724)   i++; ul_test[i].num = 0x000000000000000FUL; ul_test[i].expected = "15";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  725) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  726)   i++; ul_test[i].num = 0xC000000000000000UL; ul_test[i].expected = "13835058055282163712";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  727)   i++; ul_test[i].num = 0x0C00000000000000UL; ul_test[i].expected = "864691128455135232";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  728)   i++; ul_test[i].num = 0x00C0000000000000UL; ul_test[i].expected = "54043195528445952";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  729)   i++; ul_test[i].num = 0x000C000000000000UL; ul_test[i].expected = "3377699720527872";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  730)   i++; ul_test[i].num = 0x0000C00000000000UL; ul_test[i].expected = "211106232532992";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  731)   i++; ul_test[i].num = 0x00000C0000000000UL; ul_test[i].expected = "13194139533312";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  732)   i++; ul_test[i].num = 0x000000C000000000UL; ul_test[i].expected = "824633720832";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  733)   i++; ul_test[i].num = 0x0000000C00000000UL; ul_test[i].expected = "51539607552";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  734)   i++; ul_test[i].num = 0x00000000C0000000UL; ul_test[i].expected = "3221225472";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  735)   i++; ul_test[i].num = 0x000000000C000000UL; ul_test[i].expected = "201326592";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  736)   i++; ul_test[i].num = 0x0000000000C00000UL; ul_test[i].expected = "12582912";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  737)   i++; ul_test[i].num = 0x00000000000C0000UL; ul_test[i].expected = "786432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  738)   i++; ul_test[i].num = 0x000000000000C000UL; ul_test[i].expected = "49152";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  739)   i++; ul_test[i].num = 0x0000000000000C00UL; ul_test[i].expected = "3072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  740)   i++; ul_test[i].num = 0x00000000000000C0UL; ul_test[i].expected = "192";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  741)   i++; ul_test[i].num = 0x000000000000000CUL; ul_test[i].expected = "12";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  742) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  743)   i++; ul_test[i].num = 0x00000001UL; ul_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  744)   i++; ul_test[i].num = 0x00000000UL; ul_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  745) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  746)   num_ulong_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  747) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  748) #endif
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  749) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  750)   for(i = 1; i <= num_ulong_tests; i++) {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  751) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  752)     for(j = 0; j<BUFSZ; j++)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  753)       ul_test[i].result[j] = 'X';
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  754)     ul_test[i].result[BUFSZ-1] = '\0';
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  755) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  756)     (void)curl_msprintf(ul_test[i].result, "%lu", ul_test[i].num);
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  757) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  758)     if(memcmp(ul_test[i].result,
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  759)                ul_test[i].expected,
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  760)                strlen(ul_test[i].expected))) {
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  761)       printf("unsigned long test #%.2d: Failed (Expected: %s Got: %s)\n",
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  762)              i, ul_test[i].expected, ul_test[i].result);
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  763)       failed++;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  764)     }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  765) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  766)   }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  767) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  768)   if(!failed)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  769)     printf("All curl_mprintf() unsigned long tests OK!\n");
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  770)   else
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  771)     printf("Some curl_mprintf() unsigned long tests Failed!\n");
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  772) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  773)   return failed;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  774) }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  775) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  776) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  777) static int test_signed_long_formatting(void)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  778) {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  779)   int i, j;
+d250ed4753 (Marcel Raad       2019-04-05 11:18:12 +0200  780)   int num_slong_tests = 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  781)   int failed = 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  782) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200  783) #if (SIZEOF_LONG == 2)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  784) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  785)   i = 1; sl_test[i].num = 0x7FFFL; sl_test[i].expected = "32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  786)   i++; sl_test[i].num = 0x7FFEL; sl_test[i].expected = "32766";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  787)   i++; sl_test[i].num = 0x7FFDL; sl_test[i].expected = "32765";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  788)   i++; sl_test[i].num = 0x7F00L; sl_test[i].expected = "32512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  789)   i++; sl_test[i].num = 0x07F0L; sl_test[i].expected = "2032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  790)   i++; sl_test[i].num = 0x007FL; sl_test[i].expected = "127";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  791) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  792)   i++; sl_test[i].num = 0x7000L; sl_test[i].expected = "28672";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  793)   i++; sl_test[i].num = 0x0700L; sl_test[i].expected = "1792";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  794)   i++; sl_test[i].num = 0x0070L; sl_test[i].expected = "112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  795)   i++; sl_test[i].num = 0x0007L; sl_test[i].expected = "7";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  796) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  797)   i++; sl_test[i].num = 0x5000L; sl_test[i].expected = "20480";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  798)   i++; sl_test[i].num = 0x0500L; sl_test[i].expected = "1280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  799)   i++; sl_test[i].num = 0x0050L; sl_test[i].expected = "80";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  800)   i++; sl_test[i].num = 0x0005L; sl_test[i].expected = "5";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  801) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  802)   i++; sl_test[i].num = 0x0001L; sl_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  803)   i++; sl_test[i].num = 0x0000L; sl_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  804) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  805)   i++; sl_test[i].num = -0x7FFFL -1L; sl_test[i].expected = "-32768";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  806)   i++; sl_test[i].num = -0x7FFEL -1L; sl_test[i].expected = "-32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  807)   i++; sl_test[i].num = -0x7FFDL -1L; sl_test[i].expected = "-32766";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  808)   i++; sl_test[i].num = -0x7F00L -1L; sl_test[i].expected = "-32513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  809)   i++; sl_test[i].num = -0x07F0L -1L; sl_test[i].expected = "-2033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  810)   i++; sl_test[i].num = -0x007FL -1L; sl_test[i].expected = "-128";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  811) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  812)   i++; sl_test[i].num = -0x7000L -1L; sl_test[i].expected = "-28673";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  813)   i++; sl_test[i].num = -0x0700L -1L; sl_test[i].expected = "-1793";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  814)   i++; sl_test[i].num = -0x0070L -1L; sl_test[i].expected = "-113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  815)   i++; sl_test[i].num = -0x0007L -1L; sl_test[i].expected = "-8";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  816) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  817)   i++; sl_test[i].num = -0x5000L -1L; sl_test[i].expected = "-20481";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  818)   i++; sl_test[i].num = -0x0500L -1L; sl_test[i].expected = "-1281";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  819)   i++; sl_test[i].num = -0x0050L -1L; sl_test[i].expected = "-81";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  820)   i++; sl_test[i].num = -0x0005L -1L; sl_test[i].expected = "-6";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  821) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  822)   i++; sl_test[i].num =  0x0000L -1L; sl_test[i].expected = "-1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  823) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  824)   num_slong_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  825) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200  826) #elif (SIZEOF_LONG == 4)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  827) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  828)   i = 1; sl_test[i].num = 0x7FFFFFFFL; sl_test[i].expected = "2147483647";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  829)   i++; sl_test[i].num = 0x7FFFFFFEL; sl_test[i].expected = "2147483646";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  830)   i++; sl_test[i].num = 0x7FFFFFFDL; sl_test[i].expected = "2147483645";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  831)   i++; sl_test[i].num = 0x7FFF0000L; sl_test[i].expected = "2147418112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  832)   i++; sl_test[i].num = 0x00007FFFL; sl_test[i].expected = "32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  833) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  834)   i++; sl_test[i].num = 0x7F000000L; sl_test[i].expected = "2130706432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  835)   i++; sl_test[i].num = 0x007F0000L; sl_test[i].expected = "8323072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  836)   i++; sl_test[i].num = 0x00007F00L; sl_test[i].expected = "32512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  837)   i++; sl_test[i].num = 0x0000007FL; sl_test[i].expected = "127";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  838) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  839)   i++; sl_test[i].num = 0x70000000L; sl_test[i].expected = "1879048192";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  840)   i++; sl_test[i].num = 0x07000000L; sl_test[i].expected = "117440512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  841)   i++; sl_test[i].num = 0x00700000L; sl_test[i].expected = "7340032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  842)   i++; sl_test[i].num = 0x00070000L; sl_test[i].expected = "458752";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  843)   i++; sl_test[i].num = 0x00007000L; sl_test[i].expected = "28672";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  844)   i++; sl_test[i].num = 0x00000700L; sl_test[i].expected = "1792";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  845)   i++; sl_test[i].num = 0x00000070L; sl_test[i].expected = "112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  846)   i++; sl_test[i].num = 0x00000007L; sl_test[i].expected = "7";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  847) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  848)   i++; sl_test[i].num = 0x50000000L; sl_test[i].expected = "1342177280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  849)   i++; sl_test[i].num = 0x05000000L; sl_test[i].expected = "83886080";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  850)   i++; sl_test[i].num = 0x00500000L; sl_test[i].expected = "5242880";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  851)   i++; sl_test[i].num = 0x00050000L; sl_test[i].expected = "327680";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  852)   i++; sl_test[i].num = 0x00005000L; sl_test[i].expected = "20480";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  853)   i++; sl_test[i].num = 0x00000500L; sl_test[i].expected = "1280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  854)   i++; sl_test[i].num = 0x00000050L; sl_test[i].expected = "80";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  855)   i++; sl_test[i].num = 0x00000005L; sl_test[i].expected = "5";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  856) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  857)   i++; sl_test[i].num = 0x00000001L; sl_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  858)   i++; sl_test[i].num = 0x00000000L; sl_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  859) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  860)   i++; sl_test[i].num = -0x7FFFFFFFL -1L; sl_test[i].expected = "-2147483648";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  861)   i++; sl_test[i].num = -0x7FFFFFFEL -1L; sl_test[i].expected = "-2147483647";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  862)   i++; sl_test[i].num = -0x7FFFFFFDL -1L; sl_test[i].expected = "-2147483646";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  863)   i++; sl_test[i].num = -0x7FFF0000L -1L; sl_test[i].expected = "-2147418113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  864)   i++; sl_test[i].num = -0x00007FFFL -1L; sl_test[i].expected = "-32768";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  865) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  866)   i++; sl_test[i].num = -0x7F000000L -1L; sl_test[i].expected = "-2130706433";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  867)   i++; sl_test[i].num = -0x007F0000L -1L; sl_test[i].expected = "-8323073";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  868)   i++; sl_test[i].num = -0x00007F00L -1L; sl_test[i].expected = "-32513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  869)   i++; sl_test[i].num = -0x0000007FL -1L; sl_test[i].expected = "-128";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  870) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  871)   i++; sl_test[i].num = -0x70000000L -1L; sl_test[i].expected = "-1879048193";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  872)   i++; sl_test[i].num = -0x07000000L -1L; sl_test[i].expected = "-117440513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  873)   i++; sl_test[i].num = -0x00700000L -1L; sl_test[i].expected = "-7340033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  874)   i++; sl_test[i].num = -0x00070000L -1L; sl_test[i].expected = "-458753";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  875)   i++; sl_test[i].num = -0x00007000L -1L; sl_test[i].expected = "-28673";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  876)   i++; sl_test[i].num = -0x00000700L -1L; sl_test[i].expected = "-1793";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  877)   i++; sl_test[i].num = -0x00000070L -1L; sl_test[i].expected = "-113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  878)   i++; sl_test[i].num = -0x00000007L -1L; sl_test[i].expected = "-8";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  879) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  880)   i++; sl_test[i].num = -0x50000000L -1L; sl_test[i].expected = "-1342177281";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  881)   i++; sl_test[i].num = -0x05000000L -1L; sl_test[i].expected = "-83886081";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  882)   i++; sl_test[i].num = -0x00500000L -1L; sl_test[i].expected = "-5242881";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  883)   i++; sl_test[i].num = -0x00050000L -1L; sl_test[i].expected = "-327681";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  884)   i++; sl_test[i].num = -0x00005000L -1L; sl_test[i].expected = "-20481";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  885)   i++; sl_test[i].num = -0x00000500L -1L; sl_test[i].expected = "-1281";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  886)   i++; sl_test[i].num = -0x00000050L -1L; sl_test[i].expected = "-81";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  887)   i++; sl_test[i].num = -0x00000005L -1L; sl_test[i].expected = "-6";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  888) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  889)   i++; sl_test[i].num =  0x00000000L -1L; sl_test[i].expected = "-1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  890) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  891)   num_slong_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  892) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200  893) #elif (SIZEOF_LONG == 8)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  894) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  895)   i = 1; sl_test[i].num = 0x7FFFFFFFFFFFFFFFL; sl_test[i].expected = "9223372036854775807";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  896)   i++; sl_test[i].num = 0x7FFFFFFFFFFFFFFEL; sl_test[i].expected = "9223372036854775806";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  897)   i++; sl_test[i].num = 0x7FFFFFFFFFFFFFFDL; sl_test[i].expected = "9223372036854775805";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  898)   i++; sl_test[i].num = 0x7FFFFFFF00000000L; sl_test[i].expected = "9223372032559808512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  899)   i++; sl_test[i].num = 0x000000007FFFFFFFL; sl_test[i].expected = "2147483647";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  900) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  901)   i++; sl_test[i].num = 0x7FFF000000000000L; sl_test[i].expected = "9223090561878065152";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  902)   i++; sl_test[i].num = 0x00007FFF00000000L; sl_test[i].expected = "140733193388032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  903)   i++; sl_test[i].num = 0x000000007FFF0000L; sl_test[i].expected = "2147418112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  904)   i++; sl_test[i].num = 0x0000000000007FFFL; sl_test[i].expected = "32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  905) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  906)   i++; sl_test[i].num = 0x7F00000000000000L; sl_test[i].expected = "9151314442816847872";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  907)   i++; sl_test[i].num = 0x007F000000000000L; sl_test[i].expected = "35747322042253312";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  908)   i++; sl_test[i].num = 0x00007F0000000000L; sl_test[i].expected = "139637976727552";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  909)   i++; sl_test[i].num = 0x0000007F00000000L; sl_test[i].expected = "545460846592";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  910)   i++; sl_test[i].num = 0x000000007F000000L; sl_test[i].expected = "2130706432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  911)   i++; sl_test[i].num = 0x00000000007F0000L; sl_test[i].expected = "8323072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  912)   i++; sl_test[i].num = 0x0000000000007F00L; sl_test[i].expected = "32512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  913)   i++; sl_test[i].num = 0x000000000000007FL; sl_test[i].expected = "127";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  914) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  915)   i++; sl_test[i].num = 0x7000000000000000L; sl_test[i].expected = "8070450532247928832";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  916)   i++; sl_test[i].num = 0x0700000000000000L; sl_test[i].expected = "504403158265495552";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  917)   i++; sl_test[i].num = 0x0070000000000000L; sl_test[i].expected = "31525197391593472";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  918)   i++; sl_test[i].num = 0x0007000000000000L; sl_test[i].expected = "1970324836974592";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  919)   i++; sl_test[i].num = 0x0000700000000000L; sl_test[i].expected = "123145302310912";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  920)   i++; sl_test[i].num = 0x0000070000000000L; sl_test[i].expected = "7696581394432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  921)   i++; sl_test[i].num = 0x0000007000000000L; sl_test[i].expected = "481036337152";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  922)   i++; sl_test[i].num = 0x0000000700000000L; sl_test[i].expected = "30064771072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  923)   i++; sl_test[i].num = 0x0000000070000000L; sl_test[i].expected = "1879048192";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  924)   i++; sl_test[i].num = 0x0000000007000000L; sl_test[i].expected = "117440512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  925)   i++; sl_test[i].num = 0x0000000000700000L; sl_test[i].expected = "7340032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  926)   i++; sl_test[i].num = 0x0000000000070000L; sl_test[i].expected = "458752";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  927)   i++; sl_test[i].num = 0x0000000000007000L; sl_test[i].expected = "28672";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  928)   i++; sl_test[i].num = 0x0000000000000700L; sl_test[i].expected = "1792";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  929)   i++; sl_test[i].num = 0x0000000000000070L; sl_test[i].expected = "112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  930)   i++; sl_test[i].num = 0x0000000000000007L; sl_test[i].expected = "7";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  931) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  932)   i++; sl_test[i].num = 0x0000000000000001L; sl_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  933)   i++; sl_test[i].num = 0x0000000000000000L; sl_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  934) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  935)   i++; sl_test[i].num = -0x7FFFFFFFFFFFFFFFL -1L; sl_test[i].expected = "-9223372036854775808";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  936)   i++; sl_test[i].num = -0x7FFFFFFFFFFFFFFEL -1L; sl_test[i].expected = "-9223372036854775807";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  937)   i++; sl_test[i].num = -0x7FFFFFFFFFFFFFFDL -1L; sl_test[i].expected = "-9223372036854775806";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  938)   i++; sl_test[i].num = -0x7FFFFFFF00000000L -1L; sl_test[i].expected = "-9223372032559808513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  939)   i++; sl_test[i].num = -0x000000007FFFFFFFL -1L; sl_test[i].expected = "-2147483648";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  940) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  941)   i++; sl_test[i].num = -0x7FFF000000000000L -1L; sl_test[i].expected = "-9223090561878065153";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  942)   i++; sl_test[i].num = -0x00007FFF00000000L -1L; sl_test[i].expected = "-140733193388033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  943)   i++; sl_test[i].num = -0x000000007FFF0000L -1L; sl_test[i].expected = "-2147418113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  944)   i++; sl_test[i].num = -0x0000000000007FFFL -1L; sl_test[i].expected = "-32768";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  945) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  946)   i++; sl_test[i].num = -0x7F00000000000000L -1L; sl_test[i].expected = "-9151314442816847873";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  947)   i++; sl_test[i].num = -0x007F000000000000L -1L; sl_test[i].expected = "-35747322042253313";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  948)   i++; sl_test[i].num = -0x00007F0000000000L -1L; sl_test[i].expected = "-139637976727553";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  949)   i++; sl_test[i].num = -0x0000007F00000000L -1L; sl_test[i].expected = "-545460846593";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  950)   i++; sl_test[i].num = -0x000000007F000000L -1L; sl_test[i].expected = "-2130706433";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  951)   i++; sl_test[i].num = -0x00000000007F0000L -1L; sl_test[i].expected = "-8323073";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  952)   i++; sl_test[i].num = -0x0000000000007F00L -1L; sl_test[i].expected = "-32513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  953)   i++; sl_test[i].num = -0x000000000000007FL -1L; sl_test[i].expected = "-128";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  954) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  955)   i++; sl_test[i].num = -0x7000000000000000L -1L; sl_test[i].expected = "-8070450532247928833";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  956)   i++; sl_test[i].num = -0x0700000000000000L -1L; sl_test[i].expected = "-504403158265495553";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  957)   i++; sl_test[i].num = -0x0070000000000000L -1L; sl_test[i].expected = "-31525197391593473";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  958)   i++; sl_test[i].num = -0x0007000000000000L -1L; sl_test[i].expected = "-1970324836974593";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  959)   i++; sl_test[i].num = -0x0000700000000000L -1L; sl_test[i].expected = "-123145302310913";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  960)   i++; sl_test[i].num = -0x0000070000000000L -1L; sl_test[i].expected = "-7696581394433";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  961)   i++; sl_test[i].num = -0x0000007000000000L -1L; sl_test[i].expected = "-481036337153";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  962)   i++; sl_test[i].num = -0x0000000700000000L -1L; sl_test[i].expected = "-30064771073";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  963)   i++; sl_test[i].num = -0x0000000070000000L -1L; sl_test[i].expected = "-1879048193";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  964)   i++; sl_test[i].num = -0x0000000007000000L -1L; sl_test[i].expected = "-117440513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  965)   i++; sl_test[i].num = -0x0000000000700000L -1L; sl_test[i].expected = "-7340033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  966)   i++; sl_test[i].num = -0x0000000000070000L -1L; sl_test[i].expected = "-458753";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  967)   i++; sl_test[i].num = -0x0000000000007000L -1L; sl_test[i].expected = "-28673";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  968)   i++; sl_test[i].num = -0x0000000000000700L -1L; sl_test[i].expected = "-1793";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  969)   i++; sl_test[i].num = -0x0000000000000070L -1L; sl_test[i].expected = "-113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  970)   i++; sl_test[i].num = -0x0000000000000007L -1L; sl_test[i].expected = "-8";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  971) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  972)   i++; sl_test[i].num =  0x0000000000000000L -1L; sl_test[i].expected = "-1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  973) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  974)   num_slong_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  975) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  976) #endif
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  977) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  978)   for(i = 1; i <= num_slong_tests; i++) {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  979) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200  980)     for(j = 0; j<BUFSZ; j++)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  981)       sl_test[i].result[j] = 'X';
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  982)     sl_test[i].result[BUFSZ-1] = '\0';
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  983) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  984)     (void)curl_msprintf(sl_test[i].result, "%ld", sl_test[i].num);
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  985) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  986)     if(memcmp(sl_test[i].result,
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  987)               sl_test[i].expected,
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  988)               strlen(sl_test[i].expected))) {
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  989)       printf("signed long test #%.2d: Failed (Expected: %s Got: %s)\n",
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  990)              i, sl_test[i].expected, sl_test[i].result);
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  991)       failed++;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  992)     }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  993) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  994)   }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  995) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  996)   if(!failed)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  997)     printf("All curl_mprintf() signed long tests OK!\n");
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  998)   else
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000  999)     printf("Some curl_mprintf() signed long tests Failed!\n");
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1000) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1001)   return failed;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1002) }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1003) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1004) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1005) static int test_curl_off_t_formatting(void)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1006) {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1007)   int i, j;
+d250ed4753 (Marcel Raad       2019-04-05 11:18:12 +0200 1008)   int num_cofft_tests = 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1009)   int failed = 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1010) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200 1011) #if (SIZEOF_CURL_OFF_T == 2)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1012) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200 1013)   i = 1; co_test[i].num = MPRNT_OFF_T_C(0x7FFF); co_test[i].expected = "32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1014)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFE); co_test[i].expected = "32766";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1015)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFD); co_test[i].expected = "32765";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1016)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7F00); co_test[i].expected = "32512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1017)   i++; co_test[i].num = MPRNT_OFF_T_C(0x07F0); co_test[i].expected = "2032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1018)   i++; co_test[i].num = MPRNT_OFF_T_C(0x007F); co_test[i].expected = "127";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1019) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1020)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7000); co_test[i].expected = "28672";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1021)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0700); co_test[i].expected = "1792";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1022)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0070); co_test[i].expected = "112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1023)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0007); co_test[i].expected = "7";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1024) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1025)   i++; co_test[i].num = MPRNT_OFF_T_C(0x5000); co_test[i].expected = "20480";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1026)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0500); co_test[i].expected = "1280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1027)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0050); co_test[i].expected = "80";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1028)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0005); co_test[i].expected = "5";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1029) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1030)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0001); co_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1031)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000); co_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1032) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1033)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFF) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32768";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1034)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFE) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1035)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFD) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32766";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1036)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7F00) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1037)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x07F0) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1038)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x007F) -MPRNT_OFF_T_C(1); co_test[i].expected = "-128";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1039) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1040)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-28673";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1041)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0700) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1793";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1042)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0070) -MPRNT_OFF_T_C(1); co_test[i].expected = "-113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1043)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0007) -MPRNT_OFF_T_C(1); co_test[i].expected = "-8";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1044) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1045)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x5000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-20481";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1046)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0500) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1281";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1047)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0050) -MPRNT_OFF_T_C(1); co_test[i].expected = "-81";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1048)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0005) -MPRNT_OFF_T_C(1); co_test[i].expected = "-6";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1049) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1050)   i++; co_test[i].num =  MPRNT_OFF_T_C(0x0000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1051) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1052)   num_cofft_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1053) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200 1054) #elif (SIZEOF_CURL_OFF_T == 4)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1055) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200 1056)   i = 1; co_test[i].num = MPRNT_OFF_T_C(0x7FFFFFFF); co_test[i].expected = "2147483647";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1057)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFFFFFE); co_test[i].expected = "2147483646";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1058)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFFFFFD); co_test[i].expected = "2147483645";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1059)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFF0000); co_test[i].expected = "2147418112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1060)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00007FFF); co_test[i].expected = "32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1061) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1062)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7F000000); co_test[i].expected = "2130706432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1063)   i++; co_test[i].num = MPRNT_OFF_T_C(0x007F0000); co_test[i].expected = "8323072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1064)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00007F00); co_test[i].expected = "32512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1065)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000007F); co_test[i].expected = "127";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1066) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1067)   i++; co_test[i].num = MPRNT_OFF_T_C(0x70000000); co_test[i].expected = "1879048192";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1068)   i++; co_test[i].num = MPRNT_OFF_T_C(0x07000000); co_test[i].expected = "117440512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1069)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00700000); co_test[i].expected = "7340032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1070)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00070000); co_test[i].expected = "458752";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1071)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00007000); co_test[i].expected = "28672";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1072)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000700); co_test[i].expected = "1792";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1073)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000070); co_test[i].expected = "112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1074)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000007); co_test[i].expected = "7";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1075) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1076)   i++; co_test[i].num = MPRNT_OFF_T_C(0x50000000); co_test[i].expected = "1342177280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1077)   i++; co_test[i].num = MPRNT_OFF_T_C(0x05000000); co_test[i].expected = "83886080";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1078)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00500000); co_test[i].expected = "5242880";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1079)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00050000); co_test[i].expected = "327680";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1080)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00005000); co_test[i].expected = "20480";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1081)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000500); co_test[i].expected = "1280";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1082)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000050); co_test[i].expected = "80";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1083)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000005); co_test[i].expected = "5";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1084) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1085)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000001); co_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1086)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000000); co_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1087) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1088)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFFFFFF) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2147483648";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1089)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFFFFFE) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2147483647";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1090)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFFFFFD) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2147483646";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1091)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFF0000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2147418113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1092)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00007FFF) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32768";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1093) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1094)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7F000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2130706433";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1095)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x007F0000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-8323073";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1096)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00007F00) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1097)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000007F) -MPRNT_OFF_T_C(1); co_test[i].expected = "-128";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1098) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1099)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x70000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1879048193";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1100)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x07000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-117440513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1101)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00700000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-7340033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1102)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00070000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-458753";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1103)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00007000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-28673";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1104)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00000700) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1793";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1105)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00000070) -MPRNT_OFF_T_C(1); co_test[i].expected = "-113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1106)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00000007) -MPRNT_OFF_T_C(1); co_test[i].expected = "-8";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1107) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1108)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x50000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1342177281";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1109)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x05000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-83886081";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1110)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00500000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-5242881";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1111)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00050000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-327681";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1112)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00005000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-20481";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1113)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00000500) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1281";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1114)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00000050) -MPRNT_OFF_T_C(1); co_test[i].expected = "-81";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1115)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00000005) -MPRNT_OFF_T_C(1); co_test[i].expected = "-6";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1116) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1117)   i++; co_test[i].num =  MPRNT_OFF_T_C(0x00000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1118) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1119)   num_cofft_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1120) 
+ab2ef24d5d (Daniel Stenberg   2017-08-12 15:54:06 +0200 1121) #elif (SIZEOF_CURL_OFF_T == 8)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1122) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200 1123)   i = 1; co_test[i].num = MPRNT_OFF_T_C(0x7FFFFFFFFFFFFFFF); co_test[i].expected = "9223372036854775807";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1124)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFFFFFFFFFFFFFE); co_test[i].expected = "9223372036854775806";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1125)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFFFFFFFFFFFFFD); co_test[i].expected = "9223372036854775805";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1126)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFFFFFF00000000); co_test[i].expected = "9223372032559808512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1127)   i++; co_test[i].num = MPRNT_OFF_T_C(0x000000007FFFFFFF); co_test[i].expected = "2147483647";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1128) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1129)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7FFF000000000000); co_test[i].expected = "9223090561878065152";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1130)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00007FFF00000000); co_test[i].expected = "140733193388032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1131)   i++; co_test[i].num = MPRNT_OFF_T_C(0x000000007FFF0000); co_test[i].expected = "2147418112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1132)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000007FFF); co_test[i].expected = "32767";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1133) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1134)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7F00000000000000); co_test[i].expected = "9151314442816847872";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1135)   i++; co_test[i].num = MPRNT_OFF_T_C(0x007F000000000000); co_test[i].expected = "35747322042253312";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1136)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00007F0000000000); co_test[i].expected = "139637976727552";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1137)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000007F00000000); co_test[i].expected = "545460846592";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1138)   i++; co_test[i].num = MPRNT_OFF_T_C(0x000000007F000000); co_test[i].expected = "2130706432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1139)   i++; co_test[i].num = MPRNT_OFF_T_C(0x00000000007F0000); co_test[i].expected = "8323072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1140)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000007F00); co_test[i].expected = "32512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1141)   i++; co_test[i].num = MPRNT_OFF_T_C(0x000000000000007F); co_test[i].expected = "127";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1142) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1143)   i++; co_test[i].num = MPRNT_OFF_T_C(0x7000000000000000); co_test[i].expected = "8070450532247928832";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1144)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0700000000000000); co_test[i].expected = "504403158265495552";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1145)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0070000000000000); co_test[i].expected = "31525197391593472";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1146)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0007000000000000); co_test[i].expected = "1970324836974592";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1147)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000700000000000); co_test[i].expected = "123145302310912";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1148)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000070000000000); co_test[i].expected = "7696581394432";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1149)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000007000000000); co_test[i].expected = "481036337152";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1150)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000700000000); co_test[i].expected = "30064771072";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1151)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000070000000); co_test[i].expected = "1879048192";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1152)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000007000000); co_test[i].expected = "117440512";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1153)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000700000); co_test[i].expected = "7340032";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1154)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000070000); co_test[i].expected = "458752";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1155)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000007000); co_test[i].expected = "28672";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1156)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000000700); co_test[i].expected = "1792";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1157)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000000070); co_test[i].expected = "112";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1158)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000000007); co_test[i].expected = "7";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1159) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1160)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000000001); co_test[i].expected = "1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1161)   i++; co_test[i].num = MPRNT_OFF_T_C(0x0000000000000000); co_test[i].expected = "0";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1162) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1163)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFFFFFFFFFFFFFF) -MPRNT_OFF_T_C(1); co_test[i].expected = "-9223372036854775808";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1164)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFFFFFFFFFFFFFE) -MPRNT_OFF_T_C(1); co_test[i].expected = "-9223372036854775807";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1165)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFFFFFFFFFFFFFD) -MPRNT_OFF_T_C(1); co_test[i].expected = "-9223372036854775806";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1166)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFFFFFF00000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-9223372032559808513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1167)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x000000007FFFFFFF) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2147483648";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1168) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1169)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7FFF000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-9223090561878065153";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1170)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00007FFF00000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-140733193388033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1171)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x000000007FFF0000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2147418113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1172)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000007FFF) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32768";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1173) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1174)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7F00000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-9151314442816847873";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1175)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x007F000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-35747322042253313";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1176)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00007F0000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-139637976727553";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1177)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000007F00000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-545460846593";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1178)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x000000007F000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-2130706433";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1179)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x00000000007F0000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-8323073";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1180)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000007F00) -MPRNT_OFF_T_C(1); co_test[i].expected = "-32513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1181)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x000000000000007F) -MPRNT_OFF_T_C(1); co_test[i].expected = "-128";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1182) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1183)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x7000000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-8070450532247928833";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1184)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0700000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-504403158265495553";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1185)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0070000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-31525197391593473";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1186)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0007000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1970324836974593";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1187)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000700000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-123145302310913";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1188)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000070000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-7696581394433";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1189)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000007000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-481036337153";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1190)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000700000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-30064771073";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1191)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000070000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1879048193";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1192)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000007000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-117440513";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1193)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000700000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-7340033";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1194)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000070000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-458753";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1195)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000007000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-28673";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1196)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000000700) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1793";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1197)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000000070) -MPRNT_OFF_T_C(1); co_test[i].expected = "-113";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1198)   i++; co_test[i].num = -MPRNT_OFF_T_C(0x0000000000000007) -MPRNT_OFF_T_C(1); co_test[i].expected = "-8";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1199) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1200)   i++; co_test[i].num =  MPRNT_OFF_T_C(0x0000000000000000) -MPRNT_OFF_T_C(1); co_test[i].expected = "-1";
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1201) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1202)   num_cofft_tests = i;
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1203) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1204) #endif
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1205) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200 1206)   for(i = 1; i <= num_cofft_tests; i++) {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1207) 
+6b84438d9a (Daniel Stenberg   2017-09-09 23:09:06 +0200 1208)     for(j = 0; j<BUFSZ; j++)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1209)       co_test[i].result[j] = 'X';
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1210)     co_test[i].result[BUFSZ-1] = '\0';
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1211) 
+adeaf95e20 (Daniel Stenberg   2016-04-03 16:04:20 +0200 1212)     (void)curl_msprintf(co_test[i].result, "%" CURL_FORMAT_CURL_OFF_T,
+adeaf95e20 (Daniel Stenberg   2016-04-03 16:04:20 +0200 1213)                         co_test[i].num);
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1214) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1215)     if(memcmp(co_test[i].result,
+adeaf95e20 (Daniel Stenberg   2016-04-03 16:04:20 +0200 1216)               co_test[i].expected,
+adeaf95e20 (Daniel Stenberg   2016-04-03 16:04:20 +0200 1217)               strlen(co_test[i].expected))) {
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1218)       printf("curl_off_t test #%.2d: Failed (Expected: %s Got: %s)\n",
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1219)              i, co_test[i].expected, co_test[i].result);
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1220)       failed++;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1221)     }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1222) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1223)   }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1224) 
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1225)   if(!failed)
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1226)     printf("All curl_mprintf() curl_off_t tests OK!\n");
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1227)   else
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1228)     printf("Some curl_mprintf() curl_off_t tests Failed!\n");
+3e0b6a7d1f (Yang Tse          2008-08-18 18:52:13 +0000 1229) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1230)   return failed;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1231) }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1232) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1233) static int _string_check(int linenumber, char *buf, const char *buf2)
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1234) {
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1235)   if(strcmp(buf, buf2)) {
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1236)     /* they shouldn't differ */
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1237)     printf("sprintf line %d failed:\nwe      '%s'\nsystem: '%s'\n",
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1238)            linenumber, buf, buf2);
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1239)     return 1;
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1240)   }
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1241)   return 0;
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1242) }
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1243) #define string_check(x,y) _string_check(__LINE__, x, y)
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1244) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1245) static int _strlen_check(int linenumber, char *buf, size_t len)
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1246) {
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1247)   size_t buflen = strlen(buf);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1248)   if(len != buflen) {
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1249)     /* they shouldn't differ */
+fa2d6ba84d (Rikard Falkeborn  2018-09-16 22:04:49 +0200 1250)     printf("sprintf strlen:%d failed:\nwe '%zu'\nsystem: '%zu'\n",
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1251)            linenumber, buflen, len);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1252)     return 1;
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1253)   }
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1254)   return 0;
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1255) }
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1256) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1257) #define strlen_check(x,y) _strlen_check(__LINE__, x, y)
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1258) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1259) /*
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1260)  * The output strings in this test need to have been verified with a system
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1261)  * sprintf() before used here.
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1262)  */
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1263) static int test_string_formatting(void)
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1264) {
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1265)   int errors = 0;
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1266)   char buf[256];
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1267)   curl_msnprintf(buf, sizeof(buf), "%0*d%s", 2, 9, "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1268)   errors += string_check(buf, "09foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1269) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1270)   curl_msnprintf(buf, sizeof(buf), "%*.*s", 5, 2, "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1271)   errors += string_check(buf, "   fo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1272) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1273)   curl_msnprintf(buf, sizeof(buf), "%*.*s", 2, 5, "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1274)   errors += string_check(buf, "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1275) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1276)   curl_msnprintf(buf, sizeof(buf), "%*.*s", 0, 10, "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1277)   errors += string_check(buf, "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1278) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1279)   curl_msnprintf(buf, sizeof(buf), "%-10s", "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1280)   errors += string_check(buf, "foo       ");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1281) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1282)   curl_msnprintf(buf, sizeof(buf), "%10s", "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1283)   errors += string_check(buf, "       foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1284) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1285)   curl_msnprintf(buf, sizeof(buf), "%*.*s", -10, -10, "foo");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1286)   errors += string_check(buf, "foo       ");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1287) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1288)   if(!errors)
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1289)     printf("All curl_mprintf() strings tests OK!\n");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1290)   else
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1291)     printf("Some curl_mprintf() string tests Failed!\n");
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1292) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1293)   return errors;
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1294) }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1295) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1296) static int test_weird_arguments(void)
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1297) {
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1298)   int errors = 0;
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1299)   char buf[256];
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1300)   int rc;
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1301) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1302)   /* MAX_PARAMETERS is 128, try exact 128! */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1303)   rc = curl_msnprintf(buf, sizeof(buf),
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1304)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1305)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 1 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1306)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 2 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1307)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 3 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1308)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 4 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1309)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 5 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1310)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 6 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1311)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 7 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1312)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1313)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 9 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1314)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1315)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 11 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1316)                       "%d%d%d%d%d%d%d%d"     /* 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1317)                       ,
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1318)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1319)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 1 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1320)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 2 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1321)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 3 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1322)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 4 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1323)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 5 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1324)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 6 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1325)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 7 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1326)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1327)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 9 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1328)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1329)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 11 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1330)                       0, 1, 2, 3, 4, 5, 6, 7); /* 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1331) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1332)   if(rc != 128) {
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1333)     printf("curl_mprintf() returned %d and not 128!\n", rc);
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1334)     errors++;
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1335)   }
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1336) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1337)   errors += string_check(buf,
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1338)                          "0123456789" /* 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1339)                          "0123456789" /* 10 1 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1340)                          "0123456789" /* 10 2 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1341)                          "0123456789" /* 10 3 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1342)                          "0123456789" /* 10 4 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1343)                          "0123456789" /* 10 5 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1344)                          "0123456789" /* 10 6 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1345)                          "0123456789" /* 10 7 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1346)                          "0123456789" /* 10 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1347)                          "0123456789" /* 10 9 */
+52cc4a85fd (Daniel Stenberg   2022-10-30 17:38:16 +0100 1348)                          "0123456789" /* 10 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1349)                          "0123456789" /* 10 11 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1350)                          "01234567"   /* 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1351)     );
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1352) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1353)   /* MAX_PARAMETERS is 128, try more! */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1354)   buf[0] = 0;
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1355)   rc = curl_msnprintf(buf, sizeof(buf),
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1356)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1357)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 1 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1358)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 2 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1359)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 3 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1360)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 4 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1361)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 5 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1362)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 6 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1363)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 7 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1364)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1365)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 9 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1366)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1367)                       "%d%d%d%d%d%d%d%d%d%d" /* 10 11 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1368)                       "%d%d%d%d%d%d%d%d%d"   /* 9 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1369)                       ,
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1370)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1371)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 1 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1372)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 2 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1373)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 3 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1374)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 4 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1375)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 5 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1376)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 6 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1377)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 7 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1378)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 8 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1379)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 9 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1380)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 10 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1381)                       0, 1, 2, 3, 4, 5, 6, 7, 8, 9, /* 10 11 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1382)                       0, 1, 2, 3, 4, 5, 6, 7, 8);   /* 9 */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1383) 
+0e48ac1f99 (Daniel Stenberg   2022-07-13 23:46:16 +0200 1384)   if(rc) {
+0e48ac1f99 (Daniel Stenberg   2022-07-13 23:46:16 +0200 1385)     printf("curl_mprintf() returned %d and not 0\n", rc);
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1386)     errors++;
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1387)   }
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1388) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1389)   errors += string_check(buf, "");
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1390) 
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1391)   /* Do not skip sanity checks with parameters! */
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1392)   buf[0] = 0;
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1393)   rc = curl_msnprintf(buf, sizeof(buf), "%d, %.*1$d", 500, 1);
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1394) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1395)   if(rc != sizeof(buf) - 1) {
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1396)     printf("curl_mprintf() returned %d and not %d!\n", rc,
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1397)            sizeof(buf) - 1);
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1398)     errors++;
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1399)   }
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1400) 
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1401)   errors += strlen_check(buf, 255);
+8829703b5a (Tobias Stoeckmann 2020-07-25 17:30:12 +0200 1402) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1403)   if(errors)
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1404)     printf("Some curl_mprintf() weird arguments tests failed!\n");
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1405) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1406)   return errors;
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1407) }
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1408) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1409) /* DBL_MAX value from Linux */
+fab16de6e5 (Daniel Stenberg   2016-12-22 09:49:02 +0100 1410) #define MAXIMIZE -1.7976931348623157081452E+308
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1411) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1412) static int test_float_formatting(void)
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1413) {
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1414)   int errors = 0;
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1415)   char buf[512]; /* larger than max float size */
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1416)   curl_msnprintf(buf, sizeof(buf), "%f", 9.0);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1417)   errors += string_check(buf, "9.000000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1418) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1419)   curl_msnprintf(buf, sizeof(buf), "%.1f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1420)   errors += string_check(buf, "9.1");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1421) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1422)   curl_msnprintf(buf, sizeof(buf), "%.2f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1423)   errors += string_check(buf, "9.10");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1424) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1425)   curl_msnprintf(buf, sizeof(buf), "%.0f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1426)   errors += string_check(buf, "9");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1427) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1428)   curl_msnprintf(buf, sizeof(buf), "%0f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1429)   errors += string_check(buf, "9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1430) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1431)   curl_msnprintf(buf, sizeof(buf), "%10f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1432)   errors += string_check(buf, "  9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1433) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1434)   curl_msnprintf(buf, sizeof(buf), "%10.3f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1435)   errors += string_check(buf, "     9.100");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1436) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1437)   curl_msnprintf(buf, sizeof(buf), "%-10.3f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1438)   errors += string_check(buf, "9.100     ");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1439) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1440)   curl_msnprintf(buf, sizeof(buf), "%-10.3f", 9.123456);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1441)   errors += string_check(buf, "9.123     ");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1442) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1443)   curl_msnprintf(buf, sizeof(buf), "%.-2f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1444)   errors += string_check(buf, "9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1445) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1446)   curl_msnprintf(buf, sizeof(buf), "%*f", 10, 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1447)   errors += string_check(buf, "  9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1448) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1449)   curl_msnprintf(buf, sizeof(buf), "%*f", 3, 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1450)   errors += string_check(buf, "9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1451) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1452)   curl_msnprintf(buf, sizeof(buf), "%*f", 6, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1453)   errors += string_check(buf, "9.298765");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1454) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1455)   curl_msnprintf(buf, sizeof(buf), "%*f", 6, 9.298765);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1456)   errors += string_check(buf, "9.298765");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1457) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1458)   curl_msnprintf(buf, sizeof(buf), "%*f", 6, 9.29876);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1459)   errors += string_check(buf, "9.298760");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1460) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1461)   curl_msnprintf(buf, sizeof(buf), "%.*f", 6, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1462)   errors += string_check(buf, "9.298765");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1463)   curl_msnprintf(buf, sizeof(buf), "%.*f", 5, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1464)   errors += string_check(buf, "9.29877");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1465)   curl_msnprintf(buf, sizeof(buf), "%.*f", 4, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1466)   errors += string_check(buf, "9.2988");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1467)   curl_msnprintf(buf, sizeof(buf), "%.*f", 3, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1468)   errors += string_check(buf, "9.299");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1469)   curl_msnprintf(buf, sizeof(buf), "%.*f", 2, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1470)   errors += string_check(buf, "9.30");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1471)   curl_msnprintf(buf, sizeof(buf), "%.*f", 1, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1472)   errors += string_check(buf, "9.3");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1473)   curl_msnprintf(buf, sizeof(buf), "%.*f", 0, 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1474)   errors += string_check(buf, "9");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1475) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1476)   /* very large precisions easily turn into system specific outputs so we only
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1477)      check the output buffer length here as we know the internal limit */
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1478) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1479)   curl_msnprintf(buf, sizeof(buf), "%.*f", (1<<30), 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1480)   errors += strlen_check(buf, 325);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1481) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1482)   curl_msnprintf(buf, sizeof(buf), "%10000.10000f", 9.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1483)   errors += strlen_check(buf, 325);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1484) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1485)   curl_msnprintf(buf, sizeof(buf), "%240.10000f",
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1486)                  123456789123456789123456789.2987654);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1487)   errors += strlen_check(buf, 325);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1488) 
+35682764a9 (Jay Satiro        2017-05-29 18:04:53 -0400 1489)   /* check negative when used signed */
+35682764a9 (Jay Satiro        2017-05-29 18:04:53 -0400 1490)   curl_msnprintf(buf, sizeof(buf), "%*f", INT_MIN, 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1491)   errors += string_check(buf, "9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1492) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1493)   /* curl_msnprintf() limits a single float output to 325 bytes maximum
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1494)      width */
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1495)   curl_msnprintf(buf, sizeof(buf), "%*f", (1<<30), 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1496)   errors += string_check(buf, "                                                                                                                                                                                                                                                                                                                             9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1497)   curl_msnprintf(buf, sizeof(buf), "%100000f", 9.1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1498)   errors += string_check(buf, "                                                                                                                                                                                                                                                                                                                             9.100000");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1499) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1500)   curl_msnprintf(buf, sizeof(buf), "%f", MAXIMIZE);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1501)   errors += strlen_check(buf, 317);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1502) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1503)   curl_msnprintf(buf, 2, "%f", MAXIMIZE);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1504)   errors += strlen_check(buf, 1);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1505)   curl_msnprintf(buf, 3, "%f", MAXIMIZE);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1506)   errors += strlen_check(buf, 2);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1507)   curl_msnprintf(buf, 4, "%f", MAXIMIZE);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1508)   errors += strlen_check(buf, 3);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1509)   curl_msnprintf(buf, 5, "%f", MAXIMIZE);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1510)   errors += strlen_check(buf, 4);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1511)   curl_msnprintf(buf, 6, "%f", MAXIMIZE);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1512)   errors += strlen_check(buf, 5);
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1513) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1514)   if(!errors)
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1515)     printf("All float strings tests OK!\n");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1516)   else
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1517)     printf("test_float_formatting Failed!\n");
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1518) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1519)   return errors;
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1520) }
+e7458c1bc3 (Daniel Stenberg   2016-12-21 23:37:05 +0100 1521) /* !checksrc! enable LONGLINE */
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1522) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1523) static int test_return_codes(void)
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1524) {
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1525)   char buf[128];
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1526)   int rc;
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1527) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1528)   rc = curl_msnprintf(buf, 100, "%d", 9999);
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1529)   if(rc != 4)
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1530)     return 1;
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1531) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1532)   rc = curl_msnprintf(buf, 100, "%d", 99999);
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1533)   if(rc != 5)
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1534)     return 1;
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1535) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1536)   /* returns the length excluding the nul byte */
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1537)   rc = curl_msnprintf(buf, 5, "%d", 99999);
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1538)   if(rc != 4)
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1539)     return 1;
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1540) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1541)   /* returns the length excluding the nul byte */
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1542)   rc = curl_msnprintf(buf, 5, "%s", "helloooooooo");
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1543)   if(rc != 4)
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1544)     return 1;
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1545) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1546)   /* returns the length excluding the nul byte */
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1547)   rc = curl_msnprintf(buf, 6, "%s", "helloooooooo");
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1548)   if(rc != 5)
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1549)     return 1;
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1550) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1551)   return 0;
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1552) }
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1553) int test(char *URL)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1554) {
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1555)   int errors = 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1556)   (void)URL; /* not used */
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1557) 
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1558) #ifdef HAVE_SETLOCALE
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1559)   /*
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1560)    * The test makes assumptions about the numeric locale (specifically,
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1561)    * RADIXCHAR) so set it to a known working (and portable) one.
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1562)    */
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1563)   setlocale(LC_NUMERIC, "C");
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1564) #endif
+7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1565) 
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1566)   errors += test_weird_arguments();
+ac8a314913 (Daniel Stenberg   2016-10-08 20:47:44 +0200 1567) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000 1568)   errors += test_unsigned_short_formatting();
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000 1569) 
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000 1570)   errors += test_signed_short_formatting();
+a9a5a8e45c (Yang Tse          2010-02-04 14:41:01 +0000 1571) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000 1572)   errors += test_unsigned_int_formatting();
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000 1573) 
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000 1574)   errors += test_signed_int_formatting();
+95cef39def (Yang Tse          2008-08-21 05:19:40 +0000 1575) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1576)   errors += test_unsigned_long_formatting();
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1577) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1578)   errors += test_signed_long_formatting();
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1579) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1580)   errors += test_curl_off_t_formatting();
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1581) 
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1582)   errors += test_string_formatting();
+68701e51c1 (Jay Satiro        2016-03-09 02:59:05 -0500 1583) 
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1584)   errors += test_float_formatting();
+3ab3c16db6 (Daniel Stenberg   2016-11-08 15:32:37 +0100 1585) 
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1586)   errors += test_return_codes();
+9053dbbf62 (Daniel Stenberg   2021-07-07 14:51:17 +0200 1587) 
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1588)   if(errors)
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1589)     return TEST_ERR_MAJOR_BAD;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1590)   else
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1591)     return 0;
+2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1592) }

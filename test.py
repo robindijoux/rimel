@@ -27,7 +27,7 @@ def fileMatcher(file):
 
 def extractAllContributors(contributors):
     try:
-        with open('test.txt', 'r') as f:
+        with open('test1.txt', 'r') as f:
             for line in f:
                 x =  line.split()
                 if fileMatcher(x[1]):
@@ -112,7 +112,7 @@ def isFile(file):
         return True           
 
 def extractCommitsInfo(): 
-   subprocess.run(["find-ifdef.sh", ""], shell= True)
+   subprocess.run(["find.sh", ""], shell= True)
    contributors = []
    splitedFilesAndDirs = splitDirectoryFromFile()
    print(os.getcwd())
@@ -127,12 +127,16 @@ def extractCommitsInfo():
             print(dirAndFile[0] + "/" + dirAndFile[1])
             print("##########################################")
             os.popen(cmd)
+            time.sleep(4) 
             subprocess.run(["retrieve-info.sh"] , shell=True)
-            time.sleep(2) 
             extractAllContributors(contributors)
         else:
             continue    
    findPaternityOwner(contributors)
+   file = open("res.txt", "w+")
+   content = str(contributors)
+   file.write(content)
+   file.close()
 
 
     
