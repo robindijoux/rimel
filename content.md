@@ -108,9 +108,9 @@ Cette expérience sera utile dans notre questionnement car:
 - Nous pourront facilement déterminer l’ensemble des personnes possiblement compétentes sur telle ou telle fonctionnalité.
 - Nous auront un aperçu de s’il existe une relation **propriétaire du projet <-> plus gros contributeur <-> parent de la variabilité**.
 
-Les limites de notre raisonnement et de notre outil sont la temporalité. Comme dit précédemment, nous nous intéressons aux dernières modification sur chaque ligne à l'intérieur d'un bloc _#ifdef_. Cette démarche est plus ou moins réaliste, car à l’instant T, nous avons des données sur tout le projet dans sa toute dernière version. Il serait cependant intéressant d’analyser sur l’évolution du projet, pour que les resultats ne soient pas biaisés.
+La limite de notre raisonnement et de notre outil est principalement la temporalité. Comme dit précédemment, nous nous intéressons aux dernières modification sur chaque ligne à l'intérieur d'un bloc _#ifdef_. Cette démarche est plus ou moins réaliste, car à l’instant T, nous avons des données sur tout le projet dans sa toute dernière version. Il serait cependant intéressant d’analyser sur l’évolution du projet, pour que les resultats ne soient pas biaisés.
 
-## V. Analyse des réultats et conclusion
+## V. Analyse des résultats et conclusion
 
 ---
 
