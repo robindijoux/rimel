@@ -1,12 +1,3 @@
-7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   34) #ifdef HAVE_LOCALE_H
-7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   36) #endif
-2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   44) #endif
-2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   47) #ifdef CURL_ISOCPP
-2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   51) #endif
-95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  371) #endif
-95cef39def (Yang Tse          2008-08-21 05:19:40 +0000  599) #endif
-2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  748) #endif
-2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000  976) #endif
-2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000 1204) #endif
-7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1558) #ifdef HAVE_SETLOCALE
-7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1564) #endif
+e1be2ecba4 (Daniel Gustafsson 2018-12-11 15:02:24 +0100 31) #ifdef DEBUGBUILD
+e1be2ecba4 (Daniel Gustafsson 2018-12-11 15:02:24 +0100 34) #endif
+06d8f16b87 (Daniel Gustafsson 2018-10-23 10:02:24 +0200 36) #endif /* HEADER_CURL_URLAPI_INT_H */

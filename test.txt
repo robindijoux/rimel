@@ -1,3 +1,0 @@
-7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200   34) #ifdef HAVE_LOCALE_H
-2f71461b29 (Yang Tse          2008-08-18 09:58:08 +0000   47) #ifdef CURL_ISOCPP
-7cb1e1ee01 (Dan Fandrich      2017-05-04 18:03:03 +0200 1558) #ifdef HAVE_SETLOCALE
