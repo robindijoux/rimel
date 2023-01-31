@@ -62,7 +62,20 @@ Préciser vos zones de recherches en fonction de votre projet, les informations 
 
 ---
 
-Les sources que nous comptons exploiter afin de produire ce travail seront des bases de codes ainsi que les méta-données associées. Dans un premier temps nous utiliserons le miroir du code source de Mozilla. Nous utiliserons également les données annexes tel que la structure des répertoires et plus généralement la documentation fournie par Mozilla. De plus nous utiliserons l’api de Github afin de récupérer les informations tel que les insights, les contributeurs etc…
+Les sources que nous comptons exploiter afin de produire ce travail seront des bases de codes ainsi que les méta-données associées. Dans un premier temps nous utiliserons les code source de différents projets. Notre choix s'est porté sur:
+
+- [BusyBox](link)
+- [GeckoDev (mirroir de Mozilla Firefox)](link)
+-
+
+Ces projets ont été séléctionné de manière précise, car ils:
+
+- ont fréquences de contribution diverses (ces projets vont de ... à ... commits)
+- sont développés en C/C++, contenant des points de variabilités _#ifdef_
+- sont open-source, pour avoir libre accès au code et aux contributions de chacun
+- ont dans leur documentation des noms identifiés (parents de modules, propriétaires, etc.)
+
+Nous utiliserons également les données annexes tel que la structure des répertoires et plus généralement la documentation. De plus nous utiliserons l’api de Github afin de récupérer les informations tel que les insights, les contributeurs etc…
 
 Pour effectuer nos expériences nous avons construit notre propre outil qui utilise git fame, cppstats et git blame afin de répondre aux questions cités ci-dessus. Nous les avons combiné à des filtres grep afin d’extraire les métriques que nous souhaitons.
 
