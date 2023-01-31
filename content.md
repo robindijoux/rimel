@@ -13,7 +13,11 @@ Nous sommes 4 étudiants en dernière année à Polytech Nice Sophia en spécial
 
 ## I. Contexte
 
+---
+
 Préciser ici votre contexte et Pourquoi il est intéressant.
+
+---
 
 ## II. Question générale et décomposition en sous-questions
 
@@ -46,6 +50,8 @@ De cette question générale découlent des sous-questions :
 
 ## III. Sources d'informations et outils de travail
 
+---
+
 Préciser vos zones de recherches en fonction de votre projet, les informations dont vous disposez, ... :
 
 1. les articles ou documents utiles à votre projet
@@ -54,12 +60,24 @@ Préciser vos zones de recherches en fonction de votre projet, les informations 
 
    :bulb: Cette étape est fortement liée à la suivante. Vous ne pouvez émettre d'hypothèses à vérifier que si vous avez les informations, inversement, vous cherchez à recueillir des informations en fonction de vos hypothèses.
 
+---
+
+Les sources que nous comptons exploiter afin de produire ce travail seront des bases de codes ainsi que les méta-données associées. Dans un premier temps nous utiliserons le miroir du code source de Mozilla. Nous utiliserons également les données annexes tel que la structure des répertoires et plus généralement la documentation fournie par Mozilla. De plus nous utiliserons l’api de Github afin de récupérer les informations tel que les insights, les contributeurs etc…
+
+Pour effectuer nos expériences nous avons construit notre propre outil qui utilise git fame, cppstats et git blame afin de répondre aux questions cités ci-dessus. Nous les avons combiné à des filtres grep afin d’extraire les métriques que nous souhaitons.
+
+Concernant les métriques, nous comptons nous baser sur les informations relatives au commits qui portent les directives ifdef contenues dans github, informations obtenues par les outils cités ci-dessus.
+
 ## IV. Hypothèse et expériences
+
+---
 
 1. Il s'agit ici d'**énoncer sous forme d'hypothèses** ce que vous allez chercher à démontrer. Vous devez définir vos hypothèses de façon à pouvoir les _mesurer/vérifier facilement._ Bien sûr, votre hypothèse devrait être construite de manière à _vous aider à répondre à votre question initiale_. Explicitez ces différents points.
 2. Vous **explicitez les expérimentations que vous allez mener** pour vérifier si vos hypothèses sont vraies ou fausses. Il y a forcément des choix, des limites, explicitez-les.
 
    :bulb: Structurez cette partie à votre convenance : Hypothèse 1 => Expériences, Hypothèse 2 => Expériences ou l'ensemble des hypothèses et les expériences....
+
+---
 
 ## V. Analyse des réultats et conclusion
 
