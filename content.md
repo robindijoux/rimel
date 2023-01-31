@@ -13,23 +13,9 @@ Nous sommes 4 étudiants en dernière année à Polytech Nice Sophia en spécial
 
 ## I. Contexte
 
----
-
-Préciser ici votre contexte et Pourquoi il est intéressant.
-
-La variabilité est l’ensemble des mécanismes permettant de configurer du logiciel pour l’adapter à un contexte précis. C’est le cas par exemple d’un navigateur Web qui est prévu pour fonctionner pour différentes plateformes matérielles et différents OS et qui disposent d’une configuration complexe sur plein d’autres aspects. La variabilité peut être implémentée dans le code par différents mécanismes, par example avec la directive de préprocesseur _#ifdef_.
-En parallèle, des travaux ont montré que l’on pouvait déterminer la paternité du code et exploiter des informations de commit et des outils comme “git blame” pour trouver les contributeurs les plus actifs et pertinents sur des partie de code, comme sur une librairie.
-
----
-
-Reformulation: La variabilité permet de personnaliser le logiciel pour un usage spécifique. C'est exemplifié par un navigateur web qui peut fonctionner sur différentes plateformes et systèmes d'exploitation, et avoir une configuration complexe. La variabilité peut être mise en œuvre par des directives de préprocesseur ou des techniques plus générales telles que l'héritage, la surcharge et des modèles de conception dans les systèmes orientés objet. Des recherches ont montré qu'il est possible de déterminer l'origine du code en utilisant des informations de commit et des outils comme "git blame" pour trouver les contributeurs les plus importants sur une partie du code ou sur une bibliothèque.
-
-## II. Question générale et décomposition en sous-questions
-
-La question générale est :
-**Comment identifier la paternité d’une fonctionnalité en se basant sur la variabilité exprimée par les directives #ifdef ?**
-
-Selon nous pouvoir identifier l’expert d’une certaine fonctionnalité est intéressant pour différentes raisons:
+La variabilité permet de personnaliser le logiciel pour un usage spécifique. Cette variabilité peut être mise en œuvre, par exemple, par des directives de préprocesseur _#ifdef_. Un exemple typique de variabilité est un navigateur web qui peut fonctionner sur différentes plateformes et systèmes d'exploitation. Ce sont généralement des points critiques dans la maintenance et l'évolution d'un logicielle: les possibilités de configuration sont parfois très - voir trop - nombreuses, et il serait très bénéfique de pouvoir améliorer la prise en main de cette variabilité.
+En parallèle, des recherches ont montré qu'il est possible de déterminer - de façon automatisée - l'origine du code en utilisant des informations de commit et des outils comme _git blame_ pour trouver les contributeurs les plus importants sur une partie du code ou sur une bibliothèque.
+Nous allons donc nous intéresser à l'identification automatisée des parents de la variabilité d'un logiciel, les contributeurs experts de cette dernière. Selon nous pouvoir identifier le parent d’une certaine variabilité est intéressant pour différentes raisons:
 
 - Le solliciter dans le cas d’une régression ou un bug signalé sur cette fonctionnalité.
 
@@ -38,6 +24,11 @@ Selon nous pouvoir identifier l’expert d’une certaine fonctionnalité est in
 - Si une nouvelle recrue commence à travailler sur un sujet en relation avec la fonctionnalité, il pourra facilement identifier l’expert et lui demander des pistes par exemple. Cela peut faciliter la montée en compétence des nouvelles recrues.
 
 - L’expert pourrait faire des revues de code plus rapide et plus efficace des nouvelles extensions implémentées par des personnes qui ne connaissent pas bien la fonctionnalité.
+
+## II. Question générale et décomposition en sous-questions
+
+La question générale est :
+**Comment identifier la paternité d’une fonctionnalité en se basant sur la variabilité exprimée par les directives #ifdef ?**
 
 De cette question générale découlent des sous-questions :
 
