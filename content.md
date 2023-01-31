@@ -17,12 +17,32 @@ Préciser ici votre contexte et Pourquoi il est intéressant.
 
 ## II. Question générale et décomposition en sous-questions
 
-1. Commencez par formuler une question sur quelque chose que vous observez ou constatez ou encore une idée émergente.
-2. Préciser pourquoi cette question est intéressante de votre point de vue.
+La question générale est :
+**Comment identifier la paternité d’une fonctionnalité en se basant sur la variabilité exprimée par les directives #ifdef ?**
 
-Attention pour répondre à cette question, vous devrez être capable d'émettre des hypothèses vérifiables, de quantifier vos réponses, ...
+On trouve que pouvoir identifier l’expert d’une certaine fonctionnalité est intéressant pour les raisons suivantes :
 
-     :bulb: Cette première étape nécessite beaucoup de réflexion pour se définir la bonne question afin de poser les bonnes bases pour la suite.
+- Le solliciter dans le cas d’une régression ou un bug signalé sur cette fonctionnalité.
+
+- Toute personne ayant accès aux outils qui permettent d'identifier l’expert peuvent le solliciter directement, au lieu de demander au chef d’équipe par exemple qui lui demandera. Ce qui accélère la communication au sein d’une équipe.
+
+- Si une nouvelle recrue commence à travailler sur un sujet en relation avec la fonctionnalité, il pourra facilement identifier l’expert et lui demander des pistes par exemple. Cela peut faciliter la montée en compétence des nouvelles recrues.
+
+- L’expert pourrait faire des revues de code plus rapide et plus efficace des nouvelles extensions implémentées par des personnes qui ne connaissent pas bien la fonctionnalité.
+
+De cette question générale découlent des sous-questions :
+
+- Comment définir la paternité et la variabilité en se basant sur notre vision du sujet ?
+
+- Faut-il se limiter à la contribution de chaque personne pour déterminer la paternité ?
+
+- Pour calculer le ratio de paternité des différents contributeurs, est ce qu’il faut prendre en compte l’importance des contributions? C'est-à-dire, nous pouvons avoir une personne avec 20 commits et une autre avec 10, mais la personne avec 10 commits a contribué dans des parties plus critiques que celle avec 20 commits. Donc la personne avec 10 commits aura un ratio de paternité plus grand que celle avec 20 commits.
+
+- Faut-il compter les personnes ayant des petites contributions dans la paternité d’une fonctionnalité ? En d’autres termes, est ce que le fait de compter les personnes avec des contributions minimales dans la patérnité a une valeur pour le sujet.
+
+- Pour généraliser quels sont les critères les plus importants pour définir la paternité ?
+
+- Jusqu’à quel niveau de précision la variabilité nous permet de résoudre le problème. Peut être qu’il faut prendre en compte d’autres critères pour mieux répondre à la problématique. Et dans ce cas quels seront ces critères.
 
 ## III. Sources d'informations et outils de travail
 
