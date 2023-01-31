@@ -24,7 +24,7 @@ Préciser ici votre contexte et Pourquoi il est intéressant.
 La question générale est :
 **Comment identifier la paternité d’une fonctionnalité en se basant sur la variabilité exprimée par les directives #ifdef ?**
 
-On trouve que pouvoir identifier l’expert d’une certaine fonctionnalité est intéressant pour les raisons suivantes :
+Selon nous pouvoir identifier l’expert d’une certaine fonctionnalité est intéressant pour différentes raisons:
 
 - Le solliciter dans le cas d’une régression ou un bug signalé sur cette fonctionnalité.
 
