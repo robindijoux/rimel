@@ -79,7 +79,27 @@ Concernant les métriques, nous comptons nous baser sur les informations relativ
 
 ---
 
+Dans notre démarche nous partons de l'hypothèse suivante:
+
+**La paternité se traduit par la dernière modification du contenu d'un _#ifDef_, couplé à la quantité de code modifié. En reformulant: le dernier contributeur ayant modifié le plus de code à l'intérieur d'un bloc _#ifdef_ est considéré comme le parent. C'est ce critère que notre outil va permettre de faire ressortir.**
+
+Pour valider ou réfuter notre hypothèse, et répondre aux différentes questions que nous avons établi, nous comptons:
+
+1. Analyser le nombre de commits à l'intérieur d'un bloc “ifdef” pour chaque personne dans le projet.
+2. Déterminer pour chaque contributeur du projet et chaque point de variabilité (“ifdef”), combien de fois a-t-il contribué.
+3. Comparer ces résultats avec les informations connues sur le projet (le choix des projets testés est fait en partie sur le critère de la présence de ce genre d’informations).
+
+Cette expérience sera utile dans notre questionnement car:
+
+- Nous pourront savoir si les plus gros contributeurs sur les points de variabilité sont les parents de cette variabilité.
+- Nous pourront facilement déterminer l’ensemble des personnes possiblement compétentes sur telle ou telle fonctionnalité.
+- Nous auront un aperçu de s’il existe une relation **propriétaire du projet <-> plus gros contributeur <-> parent de la variabilité**.
+
+Les limites de notre raisonnement et de notre outil sont la temporalité. Comme dit précédemment, nous nous intéressons aux dernières modification sur chaque ligne à l'intérieur d'un bloc _#ifdef_. Cette démarche est plus ou moins réaliste, car à l’instant T, nous avons des données sur tout le projet dans sa toute dernière version. Il serait cependant intéressant d’analyser sur l’évolution du projet, pour que les resultats ne soient pas biaisés.
+
 ## V. Analyse des réultats et conclusion
+
+---
 
 1. Présentation des résultats
 2. Interprétation/Analyse des résultats en fonction de vos hypothèses
@@ -87,6 +107,10 @@ Concernant les métriques, nous comptons nous baser sur les informations relativ
 
    :bulb: Vos résultats et donc votre analyse sont nécessairement limités. Préciser bien ces limites : par exemple, jeux de données insuffisants, analyse réduite à quelques critères, dépendance aux projets analysés, ...
 
-## VI. References
+---
 
-[Debret 2020] Debret, J. (2020) La démarche scientifique : tout ce que vous devez savoir ! Available at: https://www.scribbr.fr/article-scientifique/demarche-scientifique/ (Accessed: 18 November 2022).
+## VI. Références
+
+[Documentation de git blame.](https://git-scm.com/docs/git-blame)
+
+[Documentation de git fame.](https://github.com/casperdcl/git)
