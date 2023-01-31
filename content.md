@@ -17,7 +17,12 @@ Nous sommes 4 étudiants en dernière année à Polytech Nice Sophia en spécial
 
 Préciser ici votre contexte et Pourquoi il est intéressant.
 
+La variabilité est l’ensemble des mécanismes permettant de configurer du logiciel pour l’adapter à un contexte précis. C’est le cas par exemple d’un navigateur Web qui est prévu pour fonctionner pour différentes plateformes matérielles et différents OS et qui disposent d’une configuration complexe sur plein d’autres aspects. La variabilité peut être implémentée dans le code par différents mécanismes, par example avec la directive de préprocesseur _#ifdef_.
+En parallèle, des travaux ont montré que l’on pouvait déterminer la paternité du code et exploiter des informations de commit et des outils comme “git blame” pour trouver les contributeurs les plus actifs et pertinents sur des partie de code, comme sur une librairie.
+
 ---
+
+Reformulation: La variabilité permet de personnaliser le logiciel pour un usage spécifique. C'est exemplifié par un navigateur web qui peut fonctionner sur différentes plateformes et systèmes d'exploitation, et avoir une configuration complexe. La variabilité peut être mise en œuvre par des directives de préprocesseur ou des techniques plus générales telles que l'héritage, la surcharge et des modèles de conception dans les systèmes orientés objet. Des recherches ont montré qu'il est possible de déterminer l'origine du code en utilisant des informations de commit et des outils comme "git blame" pour trouver les contributeurs les plus importants sur une partie du code ou sur une bibliothèque.
 
 ## II. Question générale et décomposition en sous-questions
 
