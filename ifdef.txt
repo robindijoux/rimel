@@ -1,177 +1,786 @@
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   1) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   2)  *  dialog.h -- common declarations for all dialog modules
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   3)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   4)  *  AUTHOR: Savio Lam (lam836@cs.cuhk.hk)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   5)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   6)  *  This program is free software; you can redistribute it and/or
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   7)  *  modify it under the terms of the GNU General Public License
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   8)  *  as published by the Free Software Foundation; either version 2
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000   9)  *  of the License, or (at your option) any later version.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  10)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  11)  *  This program is distributed in the hope that it will be useful,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  12)  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  13)  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  14)  *  GNU General Public License for more details.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  15)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  16)  *  You should have received a copy of the GNU General Public License
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  17)  *  along with this program; if not, write to the Free Software
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  18)  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  19)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  20) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  21) #include <sys/types.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  22) #include <fcntl.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  23) #include <unistd.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  24) #include <ctype.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  25) #include <stdlib.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  26) #include <string.h>
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  27) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  28) #ifdef __sun__
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  29) #define CURS_MACROS
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  30) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  31) #include CURSES_LOC
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  32) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  33) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  34)  * Colors in ncurses 1.9.9e do not work properly since foreground and
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  35)  * background colors are OR'd rather than separately masked.  This version
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  36)  * of dialog was hacked to work with ncurses 1.9.9e, making it incompatible
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  37)  * with standard curses.  The simplest fix (to make this work with standard
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  38)  * curses) uses the wbkgdset() function, not used in the original hack.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  39)  * Turn it off if we're building with 1.9.9e, since it just confuses things.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  40)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  41) #if defined(NCURSES_VERSION) && defined(_NEED_WRAP) && !defined(GCC_PRINTFLIKE)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  42) #define OLD_NCURSES 1
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  43) #undef  wbkgdset
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  44) #define wbkgdset(w,p)		/*nothing */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  45) #else
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  46) #define OLD_NCURSES 0
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  47) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  48) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  49) #define TR(params) _tracef params
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  50) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  51) #define ESC 27
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  52) #define TAB 9
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  53) #define MAX_LEN 2048
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  54) #define BUF_SIZE (10*1024)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  55) #define MIN(x,y) (x < y ? x : y)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  56) #define MAX(x,y) (x > y ? x : y)
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  57) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  58) #ifndef ACS_ULCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  59) #define ACS_ULCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  60) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  61) #ifndef ACS_LLCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  62) #define ACS_LLCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  63) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  64) #ifndef ACS_URCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  65) #define ACS_URCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  66) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  67) #ifndef ACS_LRCORNER
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  68) #define ACS_LRCORNER '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  69) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  70) #ifndef ACS_HLINE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  71) #define ACS_HLINE '-'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  72) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  73) #ifndef ACS_VLINE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  74) #define ACS_VLINE '|'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  75) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  76) #ifndef ACS_LTEE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  77) #define ACS_LTEE '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  78) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  79) #ifndef ACS_RTEE
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  80) #define ACS_RTEE '+'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  81) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  82) #ifndef ACS_UARROW
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  83) #define ACS_UARROW '^'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  84) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  85) #ifndef ACS_DARROW
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  86) #define ACS_DARROW 'v'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  87) #endif
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  88) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  89) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  90)  * Attribute names
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  91)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  92) #define screen_attr                   attributes[0]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  93) #define shadow_attr                   attributes[1]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  94) #define dialog_attr                   attributes[2]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  95) #define title_attr                    attributes[3]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  96) #define border_attr                   attributes[4]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  97) #define button_active_attr            attributes[5]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  98) #define button_inactive_attr          attributes[6]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000  99) #define button_key_active_attr        attributes[7]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 100) #define button_key_inactive_attr      attributes[8]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 101) #define button_label_active_attr      attributes[9]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 102) #define button_label_inactive_attr    attributes[10]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 103) #define inputbox_attr                 attributes[11]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 104) #define inputbox_border_attr          attributes[12]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 105) #define searchbox_attr                attributes[13]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 106) #define searchbox_title_attr          attributes[14]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 107) #define searchbox_border_attr         attributes[15]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 108) #define position_indicator_attr       attributes[16]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 109) #define menubox_attr                  attributes[17]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 110) #define menubox_border_attr           attributes[18]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 111) #define item_attr                     attributes[19]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 112) #define item_selected_attr            attributes[20]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 113) #define tag_attr                      attributes[21]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 114) #define tag_selected_attr             attributes[22]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 115) #define tag_key_attr                  attributes[23]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 116) #define tag_key_selected_attr         attributes[24]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 117) #define check_attr                    attributes[25]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 118) #define check_selected_attr           attributes[26]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 119) #define uarrow_attr                   attributes[27]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 120) #define darrow_attr                   attributes[28]
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 121) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 122) /* number of attributes */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 123) #define ATTRIBUTE_COUNT               29
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 124) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 125) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 126)  * Global variables
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 127)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 128) extern bool use_colors;
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 129) extern bool use_shadow;
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 130) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 131) extern chtype attributes[];
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 132) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 133) extern const char *backtitle;
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 134) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 135) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 136)  * Function prototypes
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 137)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 138) extern void create_rc(const char *filename);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 139) extern int parse_rc(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 140) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 141) void init_dialog(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 142) void end_dialog(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 143) void attr_clear(WINDOW * win, int height, int width, chtype attr);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 144) void dialog_clear(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 145) void color_setup(void);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 146) void print_autowrap(WINDOW * win, const char *prompt, int width, int y, int x);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 147) void print_button(WINDOW * win, const char *label, int y, int x, int selected);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 148) void print_title(WINDOW *dialog, const char *title, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 149) void draw_box(WINDOW * win, int y, int x, int height, int width, chtype box,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 150) 	      chtype border);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 151) void draw_shadow(WINDOW * win, int y, int x, int height, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 152) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 153) int first_alpha(const char *string, const char *exempt);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 154) int dialog_yesno(const char *title, const char *prompt, int height, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 155) int dialog_msgbox(const char *title, const char *prompt, int height,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 156) 		  int width, int pause);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 157) int dialog_textbox(const char *title, const char *file, int height, int width);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 158) int dialog_menu(const char *title, const char *prompt, int height, int width,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 159) 		int menu_height, const char *choice, int item_no,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 160) 		const char *const *items);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 161) int dialog_checklist(const char *title, const char *prompt, int height,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 162) 		     int width, int list_height, int item_no,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 163) 		     const char *const *items);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 164) extern char dialog_input_result[];
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 165) int dialog_inputbox(const char *title, const char *prompt, int height,
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 166) 		    int width, const char *init);
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 167) 
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 168) /*
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 169)  * This is the base for fictitious keys, which activate
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 170)  * the buttons.
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 171)  *
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 172)  * Mouse-generated keys are the following:
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 173)  *   -- the first 32 are used as numbers, in addition to '0'-'9'
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 174)  *   -- the lowercase are used to signal mouse-enter events (M_EVENT + 'o')
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 175)  *   -- uppercase chars are used to invoke the button (M_EVENT + 'O')
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 176)  */
-7d219aab70 (Denis Vlasenko 2006-10-05 10:17:08 +0000 177) #define M_EVENT (KEY_MAX+1)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   1) /***************************************************************************
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   2)  *                                  _   _ ____  _
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   3)  *  Project                     ___| | | |  _ \| |
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   4)  *                             / __| | | | |_) | |
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   5)  *                            | (__| |_| |  _ <| |___
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   6)  *                             \___|\___/|_| \_\_____|
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   7)  *
+4ec0549c39 (Daniel Stenberg   2022-04-25 09:31:09 +0200   8)  * Copyright (C) 1998 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200   9)  *
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  10)  * This software is licensed as described in the file COPYING, which
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  11)  * you should have received as part of this distribution. The terms
+4d2f800677 (Daniel Stenberg   2020-11-04 14:02:01 +0100  12)  * are also available at https://curl.se/docs/copyright.html.
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  13)  *
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  14)  * You may opt to use, copy, modify, merge, publish, distribute and/or sell
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  15)  * copies of the Software, and permit persons to whom the Software is
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  16)  * furnished to do so, under the terms of the COPYING file.
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  17)  *
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  18)  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  19)  * KIND, either express or implied.
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  20)  *
+ad9bc5976d (Max Mehl          2022-05-17 11:16:50 +0200  21)  * SPDX-License-Identifier: curl
+ad9bc5976d (Max Mehl          2022-05-17 11:16:50 +0200  22)  *
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  23)  ***************************************************************************/
+919c97fa65 (Yang Tse          2012-04-06 23:35:15 +0200  24) #include "tool_setup.h"
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  25) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  26) #if defined(MSDOS) || defined(WIN32)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  27) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  28) #if defined(HAVE_LIBGEN_H) && defined(HAVE_BASENAME)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  29) #  include <libgen.h>
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  30) #endif
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  31) 
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200  32) #ifdef WIN32
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500  33) #  include <stdlib.h>
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400  34) #  include <tlhelp32.h>
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200  35) #  include "tool_cfgable.h"
+fb3845a438 (Yang Tse          2011-09-22 11:16:34 +0200  36) #  include "tool_libinfo.h"
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200  37) #endif
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200  38) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  39) #include "tool_bname.h"
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  40) #include "tool_doswin.h"
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  41) 
+0c6112a139 (Marcel Raad       2020-07-23 21:28:14 +0200  42) #include "curlx.h"
+4a5aa6682d (Yang Tse          2013-01-04 02:50:28 +0100  43) #include "memdebug.h" /* keep this as LAST include */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  44) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  45) #ifdef WIN32
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  46) #  undef  PATH_MAX
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  47) #  define PATH_MAX MAX_PATH
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  48) #endif
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  49) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  50) #ifndef S_ISCHR
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  51) #  ifdef S_IFCHR
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  52) #    define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  53) #  else
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  54) #    define S_ISCHR(m) (0) /* cannot tell if file is a device */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  55) #  endif
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  56) #endif
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  57) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  58) #ifdef WIN32
+9c1806ae46 (Jay Satiro        2019-11-30 03:29:36 -0500  59) #  define _use_lfn(f) (1)   /* long file names always available */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  60) #elif !defined(__DJGPP__) || (__DJGPP__ < 2)  /* DJGPP 2.0 has _use_lfn() */
+9c1806ae46 (Jay Satiro        2019-11-30 03:29:36 -0500  61) #  define _use_lfn(f) (0)  /* long file names never available */
+08e0ad7b39 (Gisle Vanem       2012-06-20 23:40:42 +0200  62) #elif defined(__DJGPP__)
+08e0ad7b39 (Gisle Vanem       2012-06-20 23:40:42 +0200  63) #  include <fcntl.h>                /* _use_lfn(f) prototype */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  64) #endif
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  65) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  66) #ifndef UNITTESTS
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  67) static SANITIZEcode truncate_dryrun(const char *path,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  68)                                     const size_t truncate_pos);
+1597af51b1 (Viktor Szakats    2016-01-27 11:04:18 +0100  69) #ifdef MSDOS
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  70) static SANITIZEcode msdosify(char **const sanitized, const char *file_name,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  71)                              int flags);
+1597af51b1 (Viktor Szakats    2016-01-27 11:04:18 +0100  72) #endif
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  73) static SANITIZEcode rename_if_reserved_dos_device_name(char **const sanitized,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  74)                                                        const char *file_name,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  75)                                                        int flags);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  76) #endif /* !UNITTESTS (static declarations used if no unit tests) */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  77) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200  78) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100  79) /*
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  80) Sanitize a file or path name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  81) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  82) All banned characters are replaced by underscores, for example:
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  83) f?*foo => f__foo
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  84) f:foo::$DATA => f_foo__$DATA
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  85) f:\foo:bar => f__foo_bar
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  86) f:\foo:bar => f:\foo:bar   (flag SANITIZE_ALLOW_PATH)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  87) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  88) This function was implemented according to the guidelines in 'Naming Files,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  89) Paths, and Namespaces' section 'Naming Conventions'.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  90) https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  91) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  92) Flags
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  93) -----
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  94) SANITIZE_ALLOW_COLONS:     Allow colons.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  95) Without this flag colons are sanitized.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  96) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  97) SANITIZE_ALLOW_PATH:       Allow path separators and colons.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  98) Without this flag path separators and colons are sanitized.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500  99) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 100) SANITIZE_ALLOW_RESERVED:   Allow reserved device names.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 101) Without this flag a reserved device name is renamed (COM1 => _COM1) unless it's
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 102) in a UNC prefixed path.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 103) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 104) SANITIZE_ALLOW_TRUNCATE:   Allow truncating a long filename.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 105) Without this flag if the sanitized filename or path will be too long an error
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 106) occurs. With this flag the filename --and not any other parts of the path-- may
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 107) be truncated to at least a single character. A filename followed by an
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 108) alternate data stream (ADS) cannot be truncated in any case.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 109) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 110) Success: (SANITIZE_ERR_OK) *sanitized points to a sanitized copy of file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 111) Failure: (!= SANITIZE_ERR_OK) *sanitized is NULL.
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 112) */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 113) SANITIZEcode sanitize_file_name(char **const sanitized, const char *file_name,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 114)                                 int flags)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 115) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 116)   char *p, *target;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 117)   size_t len;
+9b6598ed08 (Jay Satiro        2016-02-05 02:22:24 -0500 118)   SANITIZEcode sc;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 119)   size_t max_sanitized_len;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 120) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 121)   if(!sanitized)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 122)     return SANITIZE_ERR_BAD_ARGUMENT;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 123) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 124)   *sanitized = NULL;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 125) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 126)   if(!file_name)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 127)     return SANITIZE_ERR_BAD_ARGUMENT;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 128) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 129)   if((flags & SANITIZE_ALLOW_PATH)) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 130) #ifndef MSDOS
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 131)     if(file_name[0] == '\\' && file_name[1] == '\\')
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 132)       /* UNC prefixed path \\ (eg \\?\C:\foo) */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 133)       max_sanitized_len = 32767-1;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 134)     else
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 135) #endif
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 136)       max_sanitized_len = PATH_MAX-1;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 137)   }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 138)   else
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 139)     /* The maximum length of a filename.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 140)        FILENAME_MAX is often the same as PATH_MAX, in other words it is 260 and
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 141)        does not discount the path information therefore we shouldn't use it. */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 142)     max_sanitized_len = (PATH_MAX-1 > 255) ? 255 : PATH_MAX-1;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 143) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 144)   len = strlen(file_name);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 145)   if(len > max_sanitized_len) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 146)     if(!(flags & SANITIZE_ALLOW_TRUNCATE) ||
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 147)        truncate_dryrun(file_name, max_sanitized_len))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 148)       return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 149) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 150)     len = max_sanitized_len;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 151)   }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 152) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 153)   target = malloc(len + 1);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 154)   if(!target)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 155)     return SANITIZE_ERR_OUT_OF_MEMORY;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 156) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 157)   strncpy(target, file_name, len);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 158)   target[len] = '\0';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 159) 
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 160) #ifndef MSDOS
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 161)   if((flags & SANITIZE_ALLOW_PATH) && !strncmp(target, "\\\\?\\", 4))
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 162)     /* Skip the literal path prefix \\?\ */
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 163)     p = target + 4;
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 164)   else
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 165) #endif
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 166)     p = target;
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 167) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 168)   /* replace control characters and other banned characters */
+4fc80f3e75 (Jay Satiro        2016-02-09 03:28:58 -0500 169)   for(; *p; ++p) {
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 170)     const char *banned;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 171) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 172)     if((1 <= *p && *p <= 31) ||
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 173)        (!(flags & (SANITIZE_ALLOW_COLONS|SANITIZE_ALLOW_PATH)) && *p == ':') ||
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 174)        (!(flags & SANITIZE_ALLOW_PATH) && (*p == '/' || *p == '\\'))) {
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 175)       *p = '_';
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 176)       continue;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 177)     }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 178) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 179)     for(banned = "|<>\"?*"; *banned; ++banned) {
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 180)       if(*p == *banned) {
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 181)         *p = '_';
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 182)         break;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 183)       }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 184)     }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 185)   }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 186) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 187)   /* remove trailing spaces and periods if not allowing paths */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 188)   if(!(flags & SANITIZE_ALLOW_PATH) && len) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 189)     char *clip = NULL;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 190) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 191)     p = &target[len];
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 192)     do {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 193)       --p;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 194)       if(*p != ' ' && *p != '.')
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 195)         break;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 196)       clip = p;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 197)     } while(p != target);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 198) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 199)     if(clip) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 200)       *clip = '\0';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 201)       len = clip - target;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 202)     }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 203)   }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 204) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 205) #ifdef MSDOS
+9b6598ed08 (Jay Satiro        2016-02-05 02:22:24 -0500 206)   sc = msdosify(&p, target, flags);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 207)   free(target);
+9b6598ed08 (Jay Satiro        2016-02-05 02:22:24 -0500 208)   if(sc)
+9b6598ed08 (Jay Satiro        2016-02-05 02:22:24 -0500 209)     return sc;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 210)   target = p;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 211)   len = strlen(target);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 212) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 213)   if(len > max_sanitized_len) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 214)     free(target);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 215)     return SANITIZE_ERR_INVALID_PATH;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 216)   }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 217) #endif
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 218) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 219)   if(!(flags & SANITIZE_ALLOW_RESERVED)) {
+9b6598ed08 (Jay Satiro        2016-02-05 02:22:24 -0500 220)     sc = rename_if_reserved_dos_device_name(&p, target, flags);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 221)     free(target);
+9b6598ed08 (Jay Satiro        2016-02-05 02:22:24 -0500 222)     if(sc)
+9b6598ed08 (Jay Satiro        2016-02-05 02:22:24 -0500 223)       return sc;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 224)     target = p;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 225)     len = strlen(target);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 226) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 227)     if(len > max_sanitized_len) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 228)       free(target);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 229)       return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 230)     }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 231)   }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 232) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 233)   *sanitized = target;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 234)   return SANITIZE_ERR_OK;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 235) }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 236) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 237) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 238) /*
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 239) Test if truncating a path to a file will leave at least a single character in
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 240) the filename. Filenames suffixed by an alternate data stream can't be
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 241) truncated. This performs a dry run, nothing is modified.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 242) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 243) Good truncate_pos 9:    C:\foo\bar  =>  C:\foo\ba
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 244) Good truncate_pos 6:    C:\foo      =>  C:\foo
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 245) Good truncate_pos 5:    C:\foo      =>  C:\fo
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 246) Bad* truncate_pos 5:    C:foo       =>  C:foo
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 247) Bad truncate_pos 5:     C:\foo:ads  =>  C:\fo
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 248) Bad truncate_pos 9:     C:\foo:ads  =>  C:\foo:ad
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 249) Bad truncate_pos 5:     C:\foo\bar  =>  C:\fo
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 250) Bad truncate_pos 5:     C:\foo\     =>  C:\fo
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 251) Bad truncate_pos 7:     C:\foo\     =>  C:\foo\
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 252) Error truncate_pos 7:   C:\foo      =>  (pos out of range)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 253) Bad truncate_pos 1:     C:\foo\     =>  C
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 254) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 255) * C:foo is ambiguous, C could end up being a drive or file therefore something
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 256)   like C:superlongfilename can't be truncated.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 257) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 258) Returns
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 259) SANITIZE_ERR_OK: Good -- 'path' can be truncated
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 260) SANITIZE_ERR_INVALID_PATH: Bad -- 'path' cannot be truncated
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 261) != SANITIZE_ERR_OK && != SANITIZE_ERR_INVALID_PATH: Error
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 262) */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 263) SANITIZEcode truncate_dryrun(const char *path, const size_t truncate_pos)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 264) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 265)   size_t len;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 266) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 267)   if(!path)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 268)     return SANITIZE_ERR_BAD_ARGUMENT;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 269) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 270)   len = strlen(path);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 271) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 272)   if(truncate_pos > len)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 273)     return SANITIZE_ERR_BAD_ARGUMENT;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 274) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 275)   if(!len || !truncate_pos)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 276)     return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 277) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 278)   if(strpbrk(&path[truncate_pos - 1], "\\/:"))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 279)     return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 280) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 281)   /* C:\foo can be truncated but C:\foo:ads can't */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 282)   if(truncate_pos > 1) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 283)     const char *p = &path[truncate_pos - 1];
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 284)     do {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 285)       --p;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 286)       if(*p == ':')
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 287)         return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 288)     } while(p != path && *p != '\\' && *p != '/');
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 289)   }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 290) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 291)   return SANITIZE_ERR_OK;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 292) }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 293) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 294) /* The functions msdosify, rename_if_dos_device_name and __crt0_glob_function
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 295)  * were taken with modification from the DJGPP port of tar 1.12. They use
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 296)  * algorithms originally from DJTAR.
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 297)  */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 298) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 299) /*
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 300) Extra sanitization MSDOS for file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 301) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 302) This is a supporting function for sanitize_file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 303) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 304) Warning: This is an MSDOS legacy function and was purposely written in a way
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 305) that some path information may pass through. For example drive letter names
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 306) (C:, D:, etc) are allowed to pass through. For sanitizing a filename use
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 307) sanitize_file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 308) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 309) Success: (SANITIZE_ERR_OK) *sanitized points to a sanitized copy of file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 310) Failure: (!= SANITIZE_ERR_OK) *sanitized is NULL.
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 311) */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 312) #if defined(MSDOS) || defined(UNITTESTS)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 313) SANITIZEcode msdosify(char **const sanitized, const char *file_name,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 314)                       int flags)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 315) {
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 316)   char dos_name[PATH_MAX];
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 317)   static const char illegal_chars_dos[] = ".+, ;=[]" /* illegal in DOS */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 318)     "|<>/\\\":?*"; /* illegal in DOS & W95 */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 319)   static const char *illegal_chars_w95 = &illegal_chars_dos[8];
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 320)   int idx, dot_idx;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 321)   const char *s = file_name;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 322)   char *d = dos_name;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 323)   const char *const dlimit = dos_name + sizeof(dos_name) - 1;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 324)   const char *illegal_aliens = illegal_chars_dos;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 325)   size_t len = sizeof(illegal_chars_dos) - 1;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 326) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 327)   if(!sanitized)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 328)     return SANITIZE_ERR_BAD_ARGUMENT;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 329) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 330)   *sanitized = NULL;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 331) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 332)   if(!file_name)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 333)     return SANITIZE_ERR_BAD_ARGUMENT;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 334) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 335)   if(strlen(file_name) > PATH_MAX-1 &&
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 336)      (!(flags & SANITIZE_ALLOW_TRUNCATE) ||
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 337)       truncate_dryrun(file_name, PATH_MAX-1)))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 338)     return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 339) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 340)   /* Support for Windows 9X VFAT systems, when available. */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 341)   if(_use_lfn(file_name)) {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 342)     illegal_aliens = illegal_chars_w95;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 343)     len -= (illegal_chars_w95 - illegal_chars_dos);
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 344)   }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 345) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 346)   /* Get past the drive letter, if any. */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 347)   if(s[0] >= 'A' && s[0] <= 'z' && s[1] == ':') {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 348)     *d++ = *s++;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 349)     *d = ((flags & (SANITIZE_ALLOW_COLONS|SANITIZE_ALLOW_PATH))) ? ':' : '_';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 350)     ++d, ++s;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 351)   }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 352) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 353)   for(idx = 0, dot_idx = -1; *s && d < dlimit; s++, d++) {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 354)     if(memchr(illegal_aliens, *s, len)) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 355) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 356)       if((flags & (SANITIZE_ALLOW_COLONS|SANITIZE_ALLOW_PATH)) && *s == ':')
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 357)         *d = ':';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 358)       else if((flags & SANITIZE_ALLOW_PATH) && (*s == '/' || *s == '\\'))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 359)         *d = *s;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 360)       /* Dots are special: DOS doesn't allow them as the leading character,
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 361)          and a file name cannot have more than a single dot.  We leave the
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 362)          first non-leading dot alone, unless it comes too close to the
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 363)          beginning of the name: we want sh.lex.c to become sh_lex.c, not
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 364)          sh.lex-c.  */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 365)       else if(*s == '.') {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 366)         if((flags & SANITIZE_ALLOW_PATH) && idx == 0 &&
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 367)            (s[1] == '/' || s[1] == '\\' ||
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 368)             (s[1] == '.' && (s[2] == '/' || s[2] == '\\')))) {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 369)           /* Copy "./" and "../" verbatim.  */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 370)           *d++ = *s++;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 371)           if(d == dlimit)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 372)             break;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 373)           if(*s == '.') {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 374)             *d++ = *s++;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 375)             if(d == dlimit)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 376)               break;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 377)           }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 378)           *d = *s;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 379)         }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 380)         else if(idx == 0)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 381)           *d = '_';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 382)         else if(dot_idx >= 0) {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 383)           if(dot_idx < 5) { /* 5 is a heuristic ad-hoc'ery */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 384)             d[dot_idx - idx] = '_'; /* replace previous dot */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 385)             *d = '.';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 386)           }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 387)           else
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 388)             *d = '-';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 389)         }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 390)         else
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 391)           *d = '.';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 392) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 393)         if(*s == '.')
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 394)           dot_idx = idx;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 395)       }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 396)       else if(*s == '+' && s[1] == '+') {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 397)         if(idx - 2 == dot_idx) { /* .c++, .h++ etc. */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 398)           *d++ = 'x';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 399)           if(d == dlimit)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 400)             break;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 401)           *d   = 'x';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 402)         }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 403)         else {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 404)           /* libg++ etc.  */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 405)           if(dlimit - d < 4) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 406)             *d++ = 'x';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 407)             if(d == dlimit)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 408)               break;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 409)             *d   = 'x';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 410)           }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 411)           else {
+b228d2952b (Daniel Stenberg   2016-12-13 23:34:59 +0100 412)             memcpy(d, "plus", 4);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 413)             d += 3;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 414)           }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 415)         }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 416)         s++;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 417)         idx++;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 418)       }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 419)       else
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 420)         *d = '_';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 421)     }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 422)     else
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 423)       *d = *s;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 424)     if(*s == '/' || *s == '\\') {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 425)       idx = 0;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 426)       dot_idx = -1;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 427)     }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 428)     else
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 429)       idx++;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 430)   }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 431)   *d = '\0';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 432) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 433)   if(*s) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 434)     /* dos_name is truncated, check that truncation requirements are met,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 435)        specifically truncating a filename suffixed by an alternate data stream
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 436)        or truncating the entire filename is not allowed. */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 437)     if(!(flags & SANITIZE_ALLOW_TRUNCATE) || strpbrk(s, "\\/:") ||
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 438)        truncate_dryrun(dos_name, d - dos_name))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 439)       return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 440)   }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 441) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 442)   *sanitized = strdup(dos_name);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 443)   return (*sanitized ? SANITIZE_ERR_OK : SANITIZE_ERR_OUT_OF_MEMORY);
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 444) }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 445) #endif /* MSDOS || UNITTESTS */
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 446) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 447) /*
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 448) Rename file_name if it's a reserved dos device name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 449) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 450) This is a supporting function for sanitize_file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 451) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 452) Warning: This is an MSDOS legacy function and was purposely written in a way
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 453) that some path information may pass through. For example drive letter names
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 454) (C:, D:, etc) are allowed to pass through. For sanitizing a filename use
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 455) sanitize_file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 456) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 457) Success: (SANITIZE_ERR_OK) *sanitized points to a sanitized copy of file_name.
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 458) Failure: (!= SANITIZE_ERR_OK) *sanitized is NULL.
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 459) */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 460) SANITIZEcode rename_if_reserved_dos_device_name(char **const sanitized,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 461)                                                 const char *file_name,
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 462)                                                 int flags)
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 463) {
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 464)   /* We could have a file whose name is a device on MS-DOS.  Trying to
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 465)    * retrieve such a file would fail at best and wedge us at worst.  We need
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 466)    * to rename such files. */
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 467)   char *p, *base;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 468)   char fname[PATH_MAX];
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 469) #ifdef MSDOS
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 470)   struct_stat st_buf;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 471) #endif
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 472) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 473)   if(!sanitized)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 474)     return SANITIZE_ERR_BAD_ARGUMENT;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 475) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 476)   *sanitized = NULL;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 477) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 478)   if(!file_name)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 479)     return SANITIZE_ERR_BAD_ARGUMENT;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 480) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 481)   /* Ignore UNC prefixed paths, they are allowed to contain a reserved name. */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 482) #ifndef MSDOS
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 483)   if((flags & SANITIZE_ALLOW_PATH) &&
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 484)      file_name[0] == '\\' && file_name[1] == '\\') {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 485)     size_t len = strlen(file_name);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 486)     *sanitized = malloc(len + 1);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 487)     if(!*sanitized)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 488)       return SANITIZE_ERR_OUT_OF_MEMORY;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 489)     strncpy(*sanitized, file_name, len + 1);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 490)     return SANITIZE_ERR_OK;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 491)   }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 492) #endif
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 493) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 494)   if(strlen(file_name) > PATH_MAX-1 &&
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 495)      (!(flags & SANITIZE_ALLOW_TRUNCATE) ||
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 496)       truncate_dryrun(file_name, PATH_MAX-1)))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 497)     return SANITIZE_ERR_INVALID_PATH;
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 498) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 499)   strncpy(fname, file_name, PATH_MAX-1);
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 500)   fname[PATH_MAX-1] = '\0';
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 501)   base = basename(fname);
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 502) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 503)   /* Rename reserved device names that are known to be accessible without \\.\
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 504)      Examples: CON => _CON, CON.EXT => CON_EXT, CON:ADS => CON_ADS
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 505)      https://support.microsoft.com/en-us/kb/74496
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 506)      https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 507)      */
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 508)   for(p = fname; p; p = (p == fname && fname != base ? base : NULL)) {
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 509)     size_t p_len;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 510)     int x = (curl_strnequal(p, "CON", 3) ||
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 511)              curl_strnequal(p, "PRN", 3) ||
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 512)              curl_strnequal(p, "AUX", 3) ||
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 513)              curl_strnequal(p, "NUL", 3)) ? 3 :
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 514)             (curl_strnequal(p, "CLOCK$", 6)) ? 6 :
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 515)             (curl_strnequal(p, "COM", 3) || curl_strnequal(p, "LPT", 3)) ?
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 516)               (('1' <= p[3] && p[3] <= '9') ? 4 : 3) : 0;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 517) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 518)     if(!x)
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 519)       continue;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 520) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 521)     /* the devices may be accessible with an extension or ADS, for
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 522)        example CON.AIR and 'CON . AIR' and CON:AIR access console */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 523) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 524)     for(; p[x] == ' '; ++x)
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 525)       ;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 526) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 527)     if(p[x] == '.') {
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 528)       p[x] = '_';
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 529)       continue;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 530)     }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 531)     else if(p[x] == ':') {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 532)       if(!(flags & (SANITIZE_ALLOW_COLONS|SANITIZE_ALLOW_PATH))) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 533)         p[x] = '_';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 534)         continue;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 535)       }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 536)       ++x;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 537)     }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 538)     else if(p[x]) /* no match */
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 539)       continue;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 540) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 541)     /* p points to 'CON' or 'CON ' or 'CON:', etc */
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 542)     p_len = strlen(p);
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 543) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 544)     /* Prepend a '_' */
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 545)     if(strlen(fname) == PATH_MAX-1) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 546)       --p_len;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 547)       if(!(flags & SANITIZE_ALLOW_TRUNCATE) || truncate_dryrun(p, p_len))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 548)         return SANITIZE_ERR_INVALID_PATH;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 549)       p[p_len] = '\0';
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 550)     }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 551)     memmove(p + 1, p, p_len + 1);
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 552)     p[0] = '_';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 553)     ++p_len;
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 554) 
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 555)     /* if fname was just modified then the basename pointer must be updated */
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 556)     if(p == fname)
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 557)       base = basename(fname);
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 558)   }
+3017d8a8d8 (Ray Satiro        2016-01-26 23:23:15 +0100 559) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 560)   /* This is the legacy portion from rename_if_dos_device_name that checks for
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 561)      reserved device names. It only works on MSDOS. On Windows XP the stat
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 562)      check errors with EINVAL if the device name is reserved. On Windows
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 563)      Vista/7/8 it sets mode S_IFREG (regular file or device). According to MSDN
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 564)      stat doc the latter behavior is correct, but that doesn't help us identify
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 565)      whether it's a reserved device name and not a regular file name. */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 566) #ifdef MSDOS
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 567)   if(base && ((stat(base, &st_buf)) == 0) && (S_ISCHR(st_buf.st_mode))) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 568)     /* Prepend a '_' */
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 569)     size_t blen = strlen(base);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 570)     if(blen) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 571)       if(strlen(fname) == PATH_MAX-1) {
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 572)         --blen;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 573)         if(!(flags & SANITIZE_ALLOW_TRUNCATE) || truncate_dryrun(base, blen))
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 574)           return SANITIZE_ERR_INVALID_PATH;
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 575)         base[blen] = '\0';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 576)       }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 577)       memmove(base + 1, base, blen + 1);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 578)       base[0] = '_';
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 579)     }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 580)   }
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 581) #endif
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 582) 
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 583)   *sanitized = strdup(fname);
+4520534e6d (Jay Satiro        2016-02-05 01:44:27 -0500 584)   return (*sanitized ? SANITIZE_ERR_OK : SANITIZE_ERR_OUT_OF_MEMORY);
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 585) }
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 586) 
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 587) #if defined(MSDOS) && (defined(__DJGPP__) || defined(__GO32__))
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 588) 
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 589) /*
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 590)  * Disable program default argument globbing. We do it on our own.
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 591)  */
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 592) char **__crt0_glob_function(char *arg)
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 593) {
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 594)   (void)arg;
+8657c268e1 (Daniel Stenberg   2016-11-23 08:30:18 +0100 595)   return (char **)0;
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 596) }
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 597) 
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 598) #endif /* MSDOS && (__DJGPP__ || __GO32__) */
+49b79b7631 (Yang Tse          2011-10-05 00:03:20 +0200 599) 
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 600) #ifdef WIN32
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 601) 
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 602) /*
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 603)  * Function to find CACert bundle on a Win32 platform using SearchPath.
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 604)  * (SearchPath is already declared via inclusions done in setup header file)
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 605)  * (Use the ASCII version instead of the unicode one!)
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 606)  * The order of the directories it searches is:
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 607)  *  1. application's directory
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 608)  *  2. current working directory
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 609)  *  3. Windows System directory (e.g. C:\windows\system32)
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 610)  *  4. Windows Directory (e.g. C:\windows)
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 611)  *  5. all directories along %PATH%
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 612)  *
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 613)  * For WinXP and later search order actually depends on registry value:
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 614)  * HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\SafeProcessSearchMode
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 615)  */
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 616) 
+705a4cb549 (Steve Holme       2014-02-23 12:59:59 +0000 617) CURLcode FindWin32CACert(struct OperationConfig *config,
+8996300211 (Dan McNulty       2017-03-10 14:27:30 -0600 618)                          curl_sslbackend backend,
+0c6112a139 (Marcel Raad       2020-07-23 21:28:14 +0200 619)                          const TCHAR *bundle_file)
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 620) {
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 621)   CURLcode result = CURLE_OK;
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 622) 
+8996300211 (Dan McNulty       2017-03-10 14:27:30 -0600 623)   /* Search and set cert file only if libcurl supports SSL.
+8996300211 (Dan McNulty       2017-03-10 14:27:30 -0600 624)    *
+180501cb02 (Daniel Stenberg   2019-01-29 10:09:29 +0100 625)    * If Schannel is the selected SSL backend then these locations are
+180501cb02 (Daniel Stenberg   2019-01-29 10:09:29 +0100 626)    * ignored. We allow setting CA location for schannel only when explicitly
+180501cb02 (Daniel Stenberg   2019-01-29 10:09:29 +0100 627)    * specified by the user via CURLOPT_CAINFO / --cacert.
+8996300211 (Dan McNulty       2017-03-10 14:27:30 -0600 628)    */
+184fc6f07a (Patrick Monnerat  2022-11-09 00:37:49 +0100 629)   if(feature_ssl && backend != CURLSSLBACKEND_SCHANNEL) {
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 630) 
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 631)     DWORD res_len;
+0c6112a139 (Marcel Raad       2020-07-23 21:28:14 +0200 632)     TCHAR buf[PATH_MAX];
+0c6112a139 (Marcel Raad       2020-07-23 21:28:14 +0200 633)     TCHAR *ptr = NULL;
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 634) 
+0c6112a139 (Marcel Raad       2020-07-23 21:28:14 +0200 635)     buf[0] = TEXT('\0');
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 636) 
+0c6112a139 (Marcel Raad       2020-07-23 21:28:14 +0200 637)     res_len = SearchPath(NULL, bundle_file, NULL, PATH_MAX, buf, &ptr);
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 638)     if(res_len > 0) {
+d3cb3be520 (Jay Satiro        2022-02-28 03:12:12 -0500 639)       char *mstr = curlx_convert_tchar_to_UTF8(buf);
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 640)       Curl_safefree(config->cacert);
+d3cb3be520 (Jay Satiro        2022-02-28 03:12:12 -0500 641)       if(mstr)
+d3cb3be520 (Jay Satiro        2022-02-28 03:12:12 -0500 642)         config->cacert = strdup(mstr);
+d3cb3be520 (Jay Satiro        2022-02-28 03:12:12 -0500 643)       curlx_unicodefree(mstr);
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 644)       if(!config->cacert)
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 645)         result = CURLE_OUT_OF_MEMORY;
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 646)     }
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 647)   }
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 648) 
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 649)   return result;
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 650) }
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 651) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 652) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 653) /* Get a list of all loaded modules with full paths.
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 654)  * Returns slist on success or NULL on error.
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 655)  */
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 656) struct curl_slist *GetLoadedModulePaths(void)
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 657) {
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 658)   HANDLE hnd = INVALID_HANDLE_VALUE;
+b88bf6e650 (Daniel Gustafsson 2018-11-18 21:57:00 +0100 659)   MODULEENTRY32 mod = {0};
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 660)   struct curl_slist *slist = NULL;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 661) 
+b88bf6e650 (Daniel Gustafsson 2018-11-18 21:57:00 +0100 662)   mod.dwSize = sizeof(MODULEENTRY32);
+b88bf6e650 (Daniel Gustafsson 2018-11-18 21:57:00 +0100 663) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 664)   do {
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 665)     hnd = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 666)   } while(hnd == INVALID_HANDLE_VALUE && GetLastError() == ERROR_BAD_LENGTH);
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 667) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 668)   if(hnd == INVALID_HANDLE_VALUE)
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 669)     goto error;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 670) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 671)   if(!Module32First(hnd, &mod))
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 672)     goto error;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 673) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 674)   do {
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 675)     char *path; /* points to stack allocated buffer */
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 676)     struct curl_slist *temp;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 677) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 678) #ifdef UNICODE
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 679)     /* sizeof(mod.szExePath) is the max total bytes of wchars. the max total
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 680)        bytes of multibyte chars won't be more than twice that. */
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 681)     char buffer[sizeof(mod.szExePath) * 2];
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 682)     if(!WideCharToMultiByte(CP_ACP, 0, mod.szExePath, -1,
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 683)                             buffer, sizeof(buffer), NULL, NULL))
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 684)       goto error;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 685)     path = buffer;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 686) #else
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 687)     path = mod.szExePath;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 688) #endif
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 689)     temp = curl_slist_append(slist, path);
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 690)     if(!temp)
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 691)       goto error;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 692)     slist = temp;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 693)   } while(Module32Next(hnd, &mod));
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 694) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 695)   goto cleanup;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 696) 
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 697) error:
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 698)   curl_slist_free_all(slist);
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 699)   slist = NULL;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 700) cleanup:
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 701)   if(hnd != INVALID_HANDLE_VALUE)
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 702)     CloseHandle(hnd);
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 703)   return slist;
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 704) }
+397664a065 (Jay Satiro        2018-11-01 02:50:40 -0400 705) 
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 706) /* The terminal settings to restore on exit */
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 707) static struct TerminalSettings {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 708)   HANDLE hStdOut;
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 709)   DWORD dwOutputMode;
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 710)   LONG valid;
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 711) } TerminalSettings;
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 712) 
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 713) #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 714) #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 715) #endif
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 716) 
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 717) static void restore_terminal(void)
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 718) {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 719)   if(InterlockedExchange(&TerminalSettings.valid, (LONG)FALSE))
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 720)     SetConsoleMode(TerminalSettings.hStdOut, TerminalSettings.dwOutputMode);
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 721) }
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 722) 
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 723) /* This is the console signal handler.
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 724)  * The system calls it in a separate thread.
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 725)  */
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 726) static BOOL WINAPI signal_handler(DWORD type)
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 727) {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 728)   if(type == CTRL_C_EVENT || type == CTRL_BREAK_EVENT)
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 729)     restore_terminal();
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 730)   return FALSE;
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 731) }
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 732) 
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 733) static void init_terminal(void)
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 734) {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 735)   TerminalSettings.hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 736)   /*
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 737)    * Enable VT (Virtual Terminal) output.
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 738)    * Note: VT mode flag can be set on any version of Windows, but VT
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 739)    * processing only performed on Win10 >= Creators Update)
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 740)    */
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 741)   if((TerminalSettings.hStdOut != INVALID_HANDLE_VALUE) &&
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 742)      GetConsoleMode(TerminalSettings.hStdOut,
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 743)                     &TerminalSettings.dwOutputMode) &&
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 744)      !(TerminalSettings.dwOutputMode &
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 745)        ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 746)     /* The signal handler is set before attempting to change the console mode
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 747)        because otherwise a signal would not be caught after the change but
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 748)        before the handler was installed. */
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 749)     (void)InterlockedExchange(&TerminalSettings.valid, (LONG)TRUE);
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 750)     if(SetConsoleCtrlHandler(signal_handler, TRUE)) {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 751)       if(SetConsoleMode(TerminalSettings.hStdOut,
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 752)                         (TerminalSettings.dwOutputMode |
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 753)                          ENABLE_VIRTUAL_TERMINAL_PROCESSING))) {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 754)         atexit(restore_terminal);
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 755)       }
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 756)       else {
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 757)         SetConsoleCtrlHandler(signal_handler, FALSE);
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 758)         (void)InterlockedExchange(&TerminalSettings.valid, (LONG)FALSE);
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 759)       }
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 760)     }
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 761)   }
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 762) }
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 763) 
+878214df44 (Daniel Stenberg   2020-04-13 23:46:18 +0200 764) LARGE_INTEGER tool_freq;
+878214df44 (Daniel Stenberg   2020-04-13 23:46:18 +0200 765) bool tool_isVistaOrGreater;
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 766) 
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 767) CURLcode win32_init(void)
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 768) {
+5044909ca2 (Jay Satiro        2021-10-04 15:52:01 -0400 769)   /* curlx_verify_windows_version must be called during init at least once
+5044909ca2 (Jay Satiro        2021-10-04 15:52:01 -0400 770)      because it has its own initialization routine. */
+7da636cad5 (Wyatt O'Day       2021-10-07 06:58:39 -0400 771)   if(curlx_verify_windows_version(6, 0, 0, PLATFORM_WINNT,
+2646be0dc0 (Cameron Cawley    2020-07-31 20:39:33 +0100 772)                                   VERSION_GREATER_THAN_EQUAL))
+878214df44 (Daniel Stenberg   2020-04-13 23:46:18 +0200 773)     tool_isVistaOrGreater = true;
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 774)   else
+2646be0dc0 (Cameron Cawley    2020-07-31 20:39:33 +0100 775)     tool_isVistaOrGreater = false;
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 776) 
+878214df44 (Daniel Stenberg   2020-04-13 23:46:18 +0200 777)   QueryPerformanceFrequency(&tool_freq);
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 778) 
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 779)   init_terminal();
+3831043eff (Jay Satiro        2020-11-19 16:49:24 -0500 780) 
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 781)   return CURLE_OK;
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 782) }
+1fc0617dcc (Jay Satiro        2020-01-24 03:34:52 -0500 783) 
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 784) #endif /* WIN32 */
+84221006c9 (Yang Tse          2011-09-20 15:58:35 +0200 785) 
+fdecb56cbf (Yang Tse          2011-09-19 18:18:17 +0200 786) #endif /* MSDOS || WIN32 */

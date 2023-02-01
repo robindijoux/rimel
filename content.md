@@ -6,9 +6,9 @@
 
 Nous sommes 4 étudiants en dernière année à Polytech Nice Sophia en spécialisation Architecture Logicielle:
 
-- CHOUHABI Amine (email)
-- BOUZOUBAA Fahde (email)
-- GROSS Paul (email)
+- CHOUHABI Amine (mohammed-amine.chouhabi@etu.unice.fr)
+- BOUZOUBAA Fahde (fahde.bouzoubaa@etu.unice.fr)
+- GROSS Paul (paul.gross@etu.unice.fr)
 - DIJOUX Robin (robin.dijoux@etu.unice.fr)
 
 ## I. Contexte
@@ -36,13 +36,10 @@ De cette question générale découlent des sous-questions :
 
 - Faut-il se limiter à la contribution de chaque personne pour déterminer la paternité ?
 
-- Pour calculer le ratio de paternité des différents contributeurs, est ce qu’il faut prendre en compte l’importance des contributions? C'est-à-dire, nous pouvons avoir une personne avec 20 commits et une autre avec 10, mais la personne avec 10 commits a contribué dans des parties plus critiques que celle avec 20 commits. Donc la personne avec 10 commits aura un ratio de paternité plus grand que celle avec 20 commits.
+- Faut-il compter les personnes ayant des petites contributions dans la paternité d’une fonctionnalité ? En d’autres termes, est ce que le fait de compter les personnes avec des contributions minimales dans la patérnité a une valeur pour le sujet ?
 
-- Faut-il compter les personnes ayant des petites contributions dans la paternité d’une fonctionnalité ? En d’autres termes, est ce que le fait de compter les personnes avec des contributions minimales dans la patérnité a une valeur pour le sujet.
+- Quels sont les critères les plus importants pour définir la paternité ?
 
-- Pour généraliser quels sont les critères les plus importants pour définir la paternité ?
-
-- Jusqu’à quel niveau de précision la variabilité nous permet de résoudre le problème. Peut être qu’il faut prendre en compte d’autres critères pour mieux répondre à la problématique. Et dans ce cas quels seront ces critères.
 
 ## III. Sources d'informations et outils de travail
 
@@ -62,8 +59,7 @@ Les sources que nous comptons exploiter afin de produire ce travail seront des b
 
 - [BusyBox](link)
 - [GeckoDev (mirroir de Mozilla Firefox)](link)
--
-
+- [Curl](link)
 Ces projets ont été séléctionné de manière précise, car ils:
 
 - ont fréquences de contribution diverses (ces projets vont de ... à ... commits)
@@ -104,7 +100,7 @@ Cette expérience sera utile dans notre questionnement car:
 - Nous pourront facilement déterminer l’ensemble des personnes possiblement compétentes sur telle ou telle fonctionnalité.
 - Nous auront un aperçu de s’il existe une relation **propriétaire du projet <-> plus gros contributeur <-> parent de la variabilité**.
 
-La limite de notre raisonnement et de notre outil est principalement la temporalité. Comme dit précédemment, nous nous intéressons aux dernières modification sur chaque ligne à l'intérieur d'un bloc _#ifdef_. Cette démarche est plus ou moins réaliste, car à l’instant T, nous avons des données sur tout le projet dans sa toute dernière version. Il serait cependant intéressant d’analyser sur l’évolution du projet, pour que les resultats ne soient pas biaisés.
+La limite de notre raisonnement et de notre outil est principalement la temporalité. Comme dit précédemment, nous nous intéressons aux dernières modification sur chaque ligne à l'intérieur d'un bloc _#ifdef_. Cette démarche est plus ou moins réaliste, car à l’instant T, nous avons des données sur tout le projet dans sa toute dernière version. Il serait cependant intéressant d’analyser sur l’évolution du projet, pour que les resultats ne soient pas biaisés. Comme solution,nous trouvons que la parrellisation du traitement des données est la meilleur solution.  
 
 ## V. Analyse des résultats et conclusion
 
@@ -115,6 +111,30 @@ La limite de notre raisonnement et de notre outil est principalement la temporal
 3. Construction d’une conclusion
 
    :bulb: Vos résultats et donc votre analyse sont nécessairement limités. Préciser bien ces limites : par exemple, jeux de données insuffisants, analyse réduite à quelques critères, dépendance aux projets analysés, ...
+
+   Notre outil permet de générer deux types de resultats: 
+   1) Le premier est le compte des commits contenant des ifdef pour chaque contributeur.
+   Exemple projet curl : ([('Daniel Stenberg', 512), ('Yang Tse', 255)).
+   Ce résultat nous permet de connaître la personne qui a utilisé le plus le preprocesseur #ifdef dans le code. Donc, c'est la personne la plus qualifié pour être le parent du projet d'après nos résultat. De plus, c'est la première personne à solliciter si on a un problème concernant une fonctionnalité.
+   Quoique, ce résultat ne nous permet pas de determiner le parent d'un seul point de variabilité. En effet, le premier résultat ne nous donne pas un apercu entre les points de variabilité et les contributeurs, d'ou le besoin d'améliorer notre résultat.
+   2) Le deuxième résultat montre quel contributeur a utilisé une certaine fonctionnlité combien de fois.
+   Exemple projet curl : [('ENABLE_IPV6', 'Daniel Stenberg', 77), ('HAVE_SYS_TYPES_H', 'Yang Tse', 36), ('ENABLE_IPV6', 'Yang Tse', 35)]
+   Ce resultat nous permet de savoir qu'elle est la personne qui a le plus commité sur un point de variabilié bien precis.
+   Cela nous permet si on le souhaite d'avoir une idée sur un point de variabilité bien précis. Donc si une personne dans une entreprise par exemple a besoin d'infos sur un point précis il sera sûr qu'il va solliciter la bonne personne. il nous permet aussi si on arrive à trouver dans les infos du projet les noms des directives #ifdef les plus importants, on peut se baser sur ce résultat afin de savoir si le plus gros contributeur du projet est celui qui utilisé les points de variabilités les plus importants. 
+   En combinant les resultats obtenus et les informations qu'on a pu trouver dans le repository du projet, on peut confirmer si le propriétaire/mainteneur du projet est bien le parent du projet si il est la personne avec le plus de contribution sur les points de variabilité. Si le résultat n'est pas conforme on en déduit que la personne qu'on a trouvé peut être l'architecte du projet ou la personne en charge des ifdef.
+
+   - Réponse aux questions: 
+   1) En se basant sur les resultats le parent du projet est la personne ayant le plus de contributions sur les points de variabilité et la personne qui est la plus visible dans la sortie de deuxième résultat. Vu qu'on prend la dernière personne ayant fait des commits sur le bloc des points de variabilités le premier résultat n'est pas suffisant. 
+   2) D'après nos resultats sur busybox et curl et libconfini, la personne identifiée par les deux résultat est bien le propriétaire du projet, donc on peut se limiter à la contribution.
+   3) Oui, on doit inclure les personnes ayant des contributions minimales dans la paternité car ils peuvent être les parents de quelques points de variabilités trés importants dans le projet.
+   4) D'après nos résultats, les critéres les plus importants sont le nombre des commits contenant des directives #ifdef, l'importance des points de variabilités où cette personne apparaît avec le deuxième resultat et finalement les compareer aux infos qu'on trouve dans le repo du projet.
+
+   - Limites
+   Notre démarche se base sur la dernière personne ayant fait des commits dans le bloc, donc si une personne rajoute que des espaces dans le bloc ifdef on va la considérer comme contributeur principal du bloc. Par conséquent, on peut avoir des faux positifs.
+   Le code prend beaucoup de temps a sortir le résultat, il faudrait parrélleliser le process pour résoudre le problème.  
+
+
+      
 
 ---
 

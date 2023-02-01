@@ -25,8 +25,7 @@ def fileMatcher(file):
      
 
 
-def extractAllContributors():
-    contributors = []
+def extractAllContributors(contributors):
     try:
         with open('test.txt', 'r') as f:
             for line in f:
@@ -113,7 +112,7 @@ def isFile(file):
         return True           
 
 def extractCommitsInfo(): 
-   #subprocess.run(["find-ifdef.sh", ""], shell= True)
+   subprocess.run(["find-ifdef.sh", ""], shell= True)
    contributors = []
    splitedFilesAndDirs = splitDirectoryFromFile()
    print(os.getcwd())
@@ -138,13 +137,13 @@ def extractCommitsInfo():
 
     
     
-#extractCommitsInfo()
+extractCommitsInfo()
 
 #splitDirectoryFromFile()
 
 #print(createCommand("busybox/archival/" , "gzip.c"))
 
-extractAllContributors()
+#extractAllContributors()
 
 #print(fileMatcher("etworking/interface.c"))
 
