@@ -1,5 +1,5 @@
 #!/bin/sh
 
-grep -rn "#ifdef" curl > ifdef_found.txt
+grep -rn "#ifdef" libconfini > ifdef_found.txt
 
 

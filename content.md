@@ -112,26 +112,28 @@ La limite de notre raisonnement et de notre outil est principalement la temporal
 
    :bulb: Vos résultats et donc votre analyse sont nécessairement limités. Préciser bien ces limites : par exemple, jeux de données insuffisants, analyse réduite à quelques critères, dépendance aux projets analysés, ...
 
-   Notre outil permet de générer deux types de resultats: 
+   Notre outil permet de générer deux types de résultats: 
    1) Le premier est le compte des commits contenant des ifdef pour chaque contributeur.
    Exemple projet curl : ([('Daniel Stenberg', 512), ('Yang Tse', 255)).
-   Ce résultat nous permet de connaître la personne qui a utilisé le plus le preprocesseur #ifdef dans le code. Donc, c'est la personne la plus qualifié pour être le parent du projet d'après nos résultat. De plus, c'est la première personne à solliciter si on a un problème concernant une fonctionnalité.
-   Quoique, ce résultat ne nous permet pas de determiner le parent d'un seul point de variabilité. En effet, le premier résultat ne nous donne pas un apercu entre les points de variabilité et les contributeurs, d'ou le besoin d'améliorer notre résultat.
+   Ce résultat nous permet de connaître la personne qui a utilisé le plus le préprocesseur #ifdef dans le code. Donc, c'est la personne la plus qualifiée pour être le parent du projet d'après nos résultats. De plus, c'est la première personne à solliciter si on a un problème concernant une fonctionnalité.
+   Quoique, ce résultat ne nous permet pas de déterminer le parent d'un seul point de variabilité. En effet, le premier résultat ne nous donne pas un aperçu entre les points de variabilité et les contributeurs, d'où le besoin d'améliorer notre résultat.
    2) Le deuxième résultat montre quel contributeur a utilisé une certaine fonctionnlité combien de fois.
    Exemple projet curl : [('ENABLE_IPV6', 'Daniel Stenberg', 77), ('HAVE_SYS_TYPES_H', 'Yang Tse', 36), ('ENABLE_IPV6', 'Yang Tse', 35)]
-   Ce resultat nous permet de savoir qu'elle est la personne qui a le plus commité sur un point de variabilié bien precis.
-   Cela nous permet si on le souhaite d'avoir une idée sur un point de variabilité bien précis. Donc si une personne dans une entreprise par exemple a besoin d'infos sur un point précis il sera sûr qu'il va solliciter la bonne personne. il nous permet aussi si on arrive à trouver dans les infos du projet les noms des directives #ifdef les plus importants, on peut se baser sur ce résultat afin de savoir si le plus gros contributeur du projet est celui qui utilisé les points de variabilités les plus importants. 
-   En combinant les resultats obtenus et les informations qu'on a pu trouver dans le repository du projet, on peut confirmer si le propriétaire/mainteneur du projet est bien le parent du projet si il est la personne avec le plus de contribution sur les points de variabilité. Si le résultat n'est pas conforme on en déduit que la personne qu'on a trouvé peut être l'architecte du projet ou la personne en charge des ifdef.
+   Ce résultat nous permet de savoir qu'elle est la personne qui a le plus commité sur un point de variabilité bien précis.
+   Il nous permet aussi si on le souhaite de connaître le parent d'un point de variabilité bien précis. Donc si une personne dans une entreprise par exemple a besoin d'infos sur un point précis il sera sûr qu'il va solliciter la bonne personne. il nous permet aussi si on arrive à trouver dans les infos du projet les noms des directives #ifdef les plus importants, on peut se baser sur ce résultat afin de savoir si le plus gros contributeur du projet est celui qui a implémenté les points de variabilités les plus importants. 
+   En combinant les résultats obtenus et les informations qu'on a pu trouver dans le repository du projet, on peut confirmer si le propriétaire/mainteneur du projet est bien le parent du projet s'il est la personne avec le plus de contribution sur les points de variabilité. Si le résultat n'est pas conforme on en déduit que la personne qu'on a trouvé peut être l'architecte du projet ou la personne en charge des ifdef.
 
    - Réponse aux questions: 
-   1) En se basant sur les resultats le parent du projet est la personne ayant le plus de contributions sur les points de variabilité et la personne qui est la plus visible dans la sortie de deuxième résultat. Vu qu'on prend la dernière personne ayant fait des commits sur le bloc des points de variabilités le premier résultat n'est pas suffisant. 
-   2) D'après nos resultats sur busybox et curl et libconfini, la personne identifiée par les deux résultat est bien le propriétaire du projet, donc on peut se limiter à la contribution.
-   3) Oui, on doit inclure les personnes ayant des contributions minimales dans la paternité car ils peuvent être les parents de quelques points de variabilités trés importants dans le projet.
-   4) D'après nos résultats, les critéres les plus importants sont le nombre des commits contenant des directives #ifdef, l'importance des points de variabilités où cette personne apparaît avec le deuxième resultat et finalement les compareer aux infos qu'on trouve dans le repo du projet.
+   1) En se basant sur les résultats le parent du projet est la personne ayant le plus de contributions sur les points de variabilité et la personne qui est la plus visible dans la sortie de deuxième résultat. Vu qu'on prend la dernière personne ayant fait des commits sur le bloc des points de variabilités le premier résultat n'est pas suffisant. 
+   2) D'après nos résultats sur busybox et curl et libconfini, la personne identifiée par les deux résultats est bien le propriétaire du projet, donc on peut se limiter à la contribution.
+   3) Oui, on doit inclure les personnes ayant des contributions minimales dans la paternité car ils peuvent être les parents de quelques points de variabilités très importants dans le projet.
+   4) D'après nos résultats, les critères les plus importants sont le nombre des commits contenant des directives #ifdef, l'importance des points de variabilités où cette personne apparaît avec le deuxième résultat et finalement les comparer aux infos qu'on trouve dans le repo du projet.
 
    - Limites
    Notre démarche se base sur la dernière personne ayant fait des commits dans le bloc, donc si une personne rajoute que des espaces dans le bloc ifdef on va la considérer comme contributeur principal du bloc. Par conséquent, on peut avoir des faux positifs.
-   Le code prend beaucoup de temps a sortir le résultat, il faudrait parrélleliser le process pour résoudre le problème.  
+   Le code prend beaucoup de temps a sortir le résultat, il faudrait parrélleliser le processus pour résoudre le problème. 
+
+   En guise de conclusion, nous pouvons dire que notre outil détecte la personne qui a le plus contribué sur les points de variabilités ifdef et donc le parent de la variabilité d'après notre hypothèse. Mais ne nous permet pas de savoir si cette personne est le propriétaire du projet ou non. Cette liaison on la confirme ou pas en fonction des informations fournies dans le repository du projet.  
 
 
       
