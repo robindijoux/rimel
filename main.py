@@ -65,8 +65,6 @@ for r, d, files in os.walk(path):
             #print(str(i) + " " + str(line_per_commit[i]))
 
 
-print(total_map)
-
 
 # Merge similar authors
 for component in total_map:
@@ -116,9 +114,5 @@ for component in top_contributors:
     top_contributors[component] = threshold_top_contributors
 
 
-
-
-
-    
 
 print(top_contributors)
