@@ -64,19 +64,18 @@ for r, d, files in os.walk(path):
             total_map[joined_line_components][commit.author.name] = total_map[joined_line_components][commit.author.name] + 1
             #print(str(i) + " " + str(line_per_commit[i]))
 
-
-
 # Merge similar authors
 for component in total_map:
     authors = list(total_map[component].keys())
 
-    for i in range(0, len(authors) - 1):
-        author1 = authors[i]
-        author2 = authors[i + 1]
+    for i in range(0, len(authors)):
+        for j in range(i + 1, len(authors)):
+            author1 = authors[i]
+            author2 = authors[j]
 
-        if(is_similar(author1, author2)):
-            total_map[component][author2] = total_map[component][author2] + total_map[component][author1]
-            del total_map[component][author1]
+            if(is_similar(author1.lower(), author2.lower())):
+                total_map[component][author2] = total_map[component][author2] + total_map[component][author1]
+                del total_map[component][author1]
 
 
 
