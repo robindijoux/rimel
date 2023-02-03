@@ -13,7 +13,9 @@ Nous sommes 4 étudiants en dernière année à Polytech Nice Sophia en spécial
 
 ## I. Contexte
 
-La variabilité permet de personnaliser le logiciel pour un usage spécifique. Cette variabilité peut être mise en œuvre, par exemple, par des directives de préprocesseur _#ifdef_. Un exemple typique de variabilité est un navigateur web qui peut fonctionner sur différentes plateformes et systèmes d'exploitation. Ce sont généralement des points critiques dans la maintenance et l'évolution d'un logicielle: les possibilités de configuration sont parfois très - voir trop - nombreuses, et il serait très bénéfique de pouvoir améliorer la prise en main de cette variabilité.
+Nous avons décidé de choisir le sujet "La paternité de la variabilité".
+
+La variabilité réfère à la mesure du changement de la variation dans un morceau de code ou un logiciel. Cette variabilité peut être mise en œuvre, par exemple, par des directives de préprocesseur _#ifdef_. Un exemple typique de variabilité est un navigateur web qui peut fonctionner sur différentes plateformes et systèmes d'exploitation. Ce sont généralement des points critiques dans la maintenance et l'évolution d'un logicielle: les possibilités de configuration sont parfois très - voir trop - nombreuses, et il serait très bénéfique de pouvoir améliorer la prise en main de cette variabilité.
 En parallèle, des recherches ont montré qu'il est possible de déterminer - de façon automatisée - l'origine du code en utilisant des informations de commit et des outils comme _git blame_ pour trouver les contributeurs les plus importants sur une partie du code ou sur une bibliothèque.
 Nous allons donc nous intéresser à l'identification automatisée des parents de la variabilité d'un logiciel, les contributeurs experts de cette dernière. Selon nous pouvoir identifier le parent d’une certaine variabilité est intéressant pour différentes raisons:
 
