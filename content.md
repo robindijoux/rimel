@@ -43,46 +43,26 @@ De cette question générale découlent des sous-questions :
 
 ## III. Sources d'informations et outils de travail
 
----
-
-Préciser vos zones de recherches en fonction de votre projet, les informations dont vous disposez, ... :
-
-1. les articles ou documents utiles à votre projet
-2. les outils
-3. les jeux de données/codes que vous allez utiliser, pourquoi ceux-ci, ...
-
-   :bulb: Cette étape est fortement liée à la suivante. Vous ne pouvez émettre d'hypothèses à vérifier que si vous avez les informations, inversement, vous cherchez à recueillir des informations en fonction de vos hypothèses.
-
----
-
 Les sources que nous comptons exploiter afin de produire ce travail seront des bases de codes ainsi que les méta-données associées. Dans un premier temps nous utiliserons les code source de différents projets. Notre choix s'est porté sur:
 
-- [BusyBox](link)
-- [GeckoDev (mirroir de Mozilla Firefox)](link)
-- [Curl](link)
+- [BusyBox](https://github.com/mirror/busybox)
+- [Curl](https://github.com/curl/curl)
+- [GeckoDev (mirroir de Mozilla Firefox)](https://github.com/mozilla/gecko-dev)
+
 Ces projets ont été séléctionné de manière précise, car ils:
 
-- ont fréquences de contribution diverses (ces projets vont de ... à ... commits)
+- ont des nombres de contributeurs diverses (ces projets vont de 240 à 5000+ contributeurs)
 - sont développés en C/C++, contenant des points de variabilités _#ifdef_
 - sont open-source, pour avoir libre accès au code et aux contributions de chacun
 - ont dans leur documentation des noms identifiés (parents de modules, propriétaires, etc.)
 
 Nous utiliserons également les données annexes tel que la structure des répertoires et plus généralement la documentation. De plus nous utiliserons l’api de Github afin de récupérer les informations tel que les insights, les contributeurs etc…
 
-Pour effectuer nos expériences nous avons construit notre propre outil qui utilise git fame, cppstats et git blame afin de répondre aux questions cités ci-dessus. Nous les avons combiné à des filtres grep afin d’extraire les métriques que nous souhaitons.
+Pour effectuer nos expériences nous avons construit notre propre outil qui utilise git fame et git blame afin de répondre aux questions cités ci-dessus. Nous les avons combiné à des filtres grep afin d’extraire les métriques que nous souhaitons.
 
-Concernant les métriques, nous comptons nous baser sur les informations relatives au commits qui portent les directives ifdef contenues dans github, informations obtenues par les outils cités ci-dessus.
+Concernant les métriques, nous comptons nous basés sur les informations relatives au commits qui portent les directives ifdef contenues dans github, informations obtenues par les outils cités ci-dessus.
 
 ## IV. Hypothèse et expériences
-
----
-
-1. Il s'agit ici d'**énoncer sous forme d'hypothèses** ce que vous allez chercher à démontrer. Vous devez définir vos hypothèses de façon à pouvoir les _mesurer/vérifier facilement._ Bien sûr, votre hypothèse devrait être construite de manière à _vous aider à répondre à votre question initiale_. Explicitez ces différents points.
-2. Vous **explicitez les expérimentations que vous allez mener** pour vérifier si vos hypothèses sont vraies ou fausses. Il y a forcément des choix, des limites, explicitez-les.
-
-   :bulb: Structurez cette partie à votre convenance : Hypothèse 1 => Expériences, Hypothèse 2 => Expériences ou l'ensemble des hypothèses et les expériences....
-
----
 
 Dans notre démarche nous partons de l'hypothèse suivante:
 
@@ -103,14 +83,6 @@ Cette expérience sera utile dans notre questionnement car:
 La limite de notre raisonnement et de notre outil est principalement la temporalité. Comme dit précédemment, nous nous intéressons aux dernières modification sur chaque ligne à l'intérieur d'un bloc _#ifdef_. Cette démarche est plus ou moins réaliste, car à l’instant T, nous avons des données sur tout le projet dans sa toute dernière version. Il serait cependant intéressant d’analyser sur l’évolution du projet, pour que les resultats ne soient pas biaisés. Comme solution,nous trouvons que la parrellisation du traitement des données est la meilleur solution.  
 
 ## V. Analyse des résultats et conclusion
-
----
-
-1. Présentation des résultats
-2. Interprétation/Analyse des résultats en fonction de vos hypothèses
-3. Construction d’une conclusion
-
-   :bulb: Vos résultats et donc votre analyse sont nécessairement limités. Préciser bien ces limites : par exemple, jeux de données insuffisants, analyse réduite à quelques critères, dépendance aux projets analysés, ...
 
    Notre outil permet de générer deux types de résultats: 
    1) Le premier est le compte des commits contenant des ifdef pour chaque contributeur.
@@ -134,11 +106,6 @@ La limite de notre raisonnement et de notre outil est principalement la temporal
    Le code prend beaucoup de temps a sortir le résultat, il faudrait parrélleliser le processus pour résoudre le problème. 
 
    En guise de conclusion, nous pouvons dire que notre outil détecte la personne qui a le plus contribué sur les points de variabilités ifdef et donc le parent de la variabilité d'après notre hypothèse. Mais ne nous permet pas de savoir si cette personne est le propriétaire du projet ou non. Cette liaison on la confirme ou pas en fonction des informations fournies dans le repository du projet.  
-
-
-      
-
----
 
 ## VI. Références
 
