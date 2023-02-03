@@ -7,27 +7,6 @@ from git import *
 import time
 
 
-class Contributor:
-    def __init__(self, my_bool, my_number):
-        self.my_bool = my_bool
-        self.my_number = my_number
-    
-    def set_bool(self, my_bool):
-        self.my_bool = my_bool
-        
-    def set_number(self, my_number):
-        self.my_number = my_number
-        
-    def get_bool(self):
-        return self.my_bool
-        
-    def get_number(self):
-        return self.my_number
-
-    def __str__(self):
-        return "boolean_value: {}, number_value: {}".format(self.my_bool, self.my_number)
-
-
 
 def contributerMatcher(date):
     regex = "(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])"
@@ -43,58 +22,12 @@ def fileMatcher(file):
         return False
     else:
         return True
-
-
-def extractMainContributor(cmd ,  contributors , directory , file):
-    contribs = []
-    allcontribs = []
-    os.popen(cmd)
-    subprocess.run(["retrieve.sh"] , shell=True)
-    time.sleep(3)
-    try:
-        with open('test1.txt', 'r') as f:
-            for line in f:
-              match = re.search(r'(\d+)\)\s+#(.*)', line)
-              if match:
-                    line_number = match.group(1)
-                    preprocessor = match.group(2)
-                    if re.match(r"ifdef", preprocessor):
-                       contributor = Contributor(True , line_number)
-                       contribs.append(contributor)
-                    else:
-                       contributor = Contributor(False , line_number)
-                       contribs.append(contributor)
-            for cont in contribs:
-                print(cont)
-            for i in range(0 , len(contribs) - 2):
-                if(contribs[i].get_bool() == True and contribs[i + 1].get_bool() == False ):
-                    print(contribs[i].get_bool())
-                    print(contribs[i + 1].get_bool())
-                    cmd1 = 'cd ' + directory[:-1] +  ' &git blame -L' + contribs[i].get_number() + ',' + contribs[i + 1].get_number() + " " + file +   ' > C:/Users/user/Documents/GitHub/rimel/ifdef.txt'
-                    print(cmd1)
-                    os.popen(cmd1)
-                    print(os.getcwd())
-                    allcontribs = extractAllContributors()
-                    dict = set()
-                    for name in allcontribs:
-                        print(name)
-                        dict.add((name,occurence(allcontribs,name)))
-                    x = sorted(list(dict),key=lambda x: -x[1])  
-                    contributors.append(x[0][0])
-                else: 
-                    continue
-            for name in contributors:
-                print("printing final names")
-                print(name)    
-            return contribs
-    except Exception as e:
-        print(e)
-
+     
 
 
 def extractAllContributors(contributors):
     try:
-        with open('bloccontribs.txt', 'r') as f:
+        with open('test1.txt', 'r') as f:
             for line in f:
                 x =  line.split()
                 if fileMatcher(x[1]):
@@ -179,7 +112,7 @@ def isFile(file):
         return True           
 
 def extractCommitsInfo(): 
-   subprocess.run(["find-ifdef.sh", ""], shell= True)
+   subprocess.run(["find.sh", ""], shell= True)
    contributors = []
    splitedFilesAndDirs = splitDirectoryFromFile()
    print(os.getcwd())
@@ -193,13 +126,17 @@ def extractCommitsInfo():
             print(cmd)
             print(dirAndFile[0] + "/" + dirAndFile[1])
             print("##########################################")
-            time.sleep(3)
             os.popen(cmd)
-            time.sleep(2) 
-            extractMainContributor(cmd ,  contributors , dirAndFile[0] , dirAndFile[1])
+            time.sleep(4) 
+            subprocess.run(["retrieve-info.sh"] , shell=True)
+            extractAllContributors(contributors)
         else:
             continue    
    findPaternityOwner(contributors)
+   file = open("res.txt", "w+")
+   content = str(contributors)
+   file.write(content)
+   file.close()
 
 
     
@@ -219,9 +156,6 @@ extractCommitsInfo()
 #print(isFile("fahd") == True and isPackExtension("fahd.c") == False)
 
 #print(splitDirectoryFromFile())
-
-
-
 
 
 

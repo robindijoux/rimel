@@ -1,3 +1,0 @@
-f7300841 (madmurphy 2020-02-05 03:39:25 +0000  36) #ifdef __cplusplus
-323660b7 (madmurphy 2020-10-06 07:58:28 +0100  45) #ifdef _LIBCONFINI_NOCCWARN_
-f7300841 (madmurphy 2020-02-05 03:39:25 +0000 593) #ifdef __cplusplus

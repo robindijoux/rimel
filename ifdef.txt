@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 f7300841 (madmurphy 2020-02-05 03:39:25 +0000   1) /*  -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4 -*-  */
 f7300841 (madmurphy 2020-02-05 03:39:25 +0000   2) 
 f7300841 (madmurphy 2020-02-05 03:39:25 +0000   3) /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ !START_OMISSION! @@@@@@@@@@@@@@@@@@@@@@@@@@@@@-
@@ -600,3 +601,9 @@ f7300841 (madmurphy 2020-02-05 03:39:25 +0000 599)
 f7300841 (madmurphy 2020-02-05 03:39:25 +0000 600) 
 f7300841 (madmurphy 2020-02-05 03:39:25 +0000 601) /*  EOF  */
 f7300841 (madmurphy 2020-02-05 03:39:25 +0000 602) 
+=======
+e1be2ecba4 (Daniel Gustafsson 2018-12-11 15:02:24 +0100 31) #ifdef DEBUGBUILD
+f703cf971c (Daniel Stenberg   2022-09-01 10:16:24 +0200 32) CURLUcode Curl_parse_port(struct Curl_URL *u, struct dynbuf *host,
+f703cf971c (Daniel Stenberg   2022-09-01 10:16:24 +0200 33)                           bool has_scheme);
+e1be2ecba4 (Daniel Gustafsson 2018-12-11 15:02:24 +0100 34) #endif
+>>>>>>> dev
