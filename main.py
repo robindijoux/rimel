@@ -1,5 +1,6 @@
 import os
 import re
+import json
 
 from git import *
 from difflib import SequenceMatcher
@@ -52,7 +53,7 @@ for r, d, files in os.walk(path):
             if(len(nested_if_def_component) == 0):
                 continue
 
-            joined_line_components = ".".join(nested_if_def_component)
+            joined_line_components = "/".join(nested_if_def_component)
 
             if joined_line_components not in total_map:
                 total_map[joined_line_components] = {}
@@ -114,4 +115,8 @@ for component in top_contributors:
 
 
 
-print(top_contributors)
+json_out = json.dumps(top_contributors)
+
+f = open("out.json", "w")
+f.write(json_out)
+f.close()
